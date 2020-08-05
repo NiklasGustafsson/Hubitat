@@ -50,7 +50,7 @@ def updateVersion()  {
 }
 
 metadata {
-	definition (name: "Current Temperature", namespace: "NiklasGustafsson", author: "Niklas Gustafsson", importUrl: "") {
+	definition (name: "Current Temperature", namespace: "NiklasGustafsson", author: "Niklas Gustafsson", importUrl: "https://raw.githubusercontent.com/NiklasGustafsson/Hubitat/master/Drivers/CurrentWeather/CurrentWeather.groovy") {
         capability "Actuator"
 		capability "Sensor"
 		capability "Polling"
