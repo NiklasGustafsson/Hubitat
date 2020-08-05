@@ -6,7 +6,7 @@
  *
  *  Copyright 2020 Niklas Gustafsson 
  *
- *  Insipired by 'Pollen Forecaster' by Bryan Turcotte (@bptworld)
+ *  Inspired by 'Pollen Forecaster' authored by Bryan Turcotte (@bptworld)
  *  
  * ------------------------------------------------------------------------------------------------------------------------------
  *  Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except
