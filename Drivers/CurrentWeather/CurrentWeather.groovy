@@ -144,12 +144,11 @@ def poll()  {
 
 					// To make things simple, we'll pick the first station we find in the list.
 
-					result.features.each {feature ->
-
-						if(!foundStation && feature.properties.stationIdentifier != null) {
-							foundStation = true
+					for (feature in result.features) {
+						if(feature.properties.stationIdentifier != null) {
 							state.stationIdentifier = feature.properties.stationIdentifier
 							if(logEnable) log.debug "Found Weather Station: ${state.stationIdentifier}"
+							break
 						}
 					}
 				}
@@ -167,7 +166,6 @@ def poll()  {
 			if(logEnable) log.debug "Getting temperature: GET ${params3.uri}"
 
 			httpGet(params3) {resp ->
-				foundFeature = false
 
 				// NWS sends things back as 'applcation/geo+json' which isn't something the HTTP
 				// stack can automatically parse, so we have to do it on our own.
@@ -182,10 +180,8 @@ def poll()  {
 				// The results are sorted with the most recent reading first, so we'll pick that up.
 				// Sometimes, the temperature value isn't filled in, in which case we move on to the next.
 
-				result.features.each {feature ->
-					if(!foundFeature && feature.properties.temperature.value != null) {
-						// TODO: deal with C vs. F
-						foundFeature = true
+				for (feature in result.features) {
+					if(feature.properties.temperature.value != null) {
 						state.currentTemperature = convertToTempScale(feature.properties.temperature)
 						state.currentWeather = feature.properties.textDescription
 						state.icon = feature.properties.icon
@@ -194,11 +190,11 @@ def poll()  {
 
 						def roundedTemp = roundToTenth(state.currentTemperature)
 
-						if(logEnable) log.debug "currentWeather: ${state.currentWeather}"
-						if(logEnable) log.debug "currentTemperature: ${roundedTemp}"
+						log.info "Information for station ${state.stationIdentifier}: weather - ${state.currentWeather} temperature - ${roundedTemp}"
 
 						sendEvent(name: "currentWeather", value: state.currentWeather, displayed: true)
 						sendEvent(name: "currentTemperature", value: roundedTemp, displayed: true)
+						break
 					}
 				}
 			}
