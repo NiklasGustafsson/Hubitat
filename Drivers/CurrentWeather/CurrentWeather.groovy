@@ -251,7 +251,7 @@ def tileMap()  {
     state.appDataToday+= "<tr><td><div style=''font-size:.80em;halign=center;'></div></td></tr>"
     state.appDataToday+= "<tr><td><div style=''font-size:.80em;halign=center;'><img src='${state.icon}'/></div></td></tr>"
     state.appDataToday+= "<tr><td><div style='font-size:.80em;halign=center;'>${state.currentWeather}</div></td></tr>"
-    state.appDataToday+= "<tr><td><div style='font-size:.80em;halign=center;'>${roundedTemp}&#186;${location.temperatureScale}</div></td></tr>"
+    state.appDataToday+= "<tr><td><div style='font-size:.80em;halign=center;'>${roundedTemp}&nbsp;&#186;${location.temperatureScale}</div></td></tr>"
     state.appDataToday+= "</table>"
     sendEvent(name: "Weather", value: state.appDataToday, displayed: true)
 }
