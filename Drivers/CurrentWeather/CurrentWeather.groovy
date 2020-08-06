@@ -75,6 +75,10 @@ def updated()  {
     poll()
 }
 
+def configure() {
+    poll()
+}
+
 def uninstalled()  {
     unschedule()
 }
@@ -91,102 +95,21 @@ def poll()  {
 
         // If we don't already know the station ID, we must retrieve it. We should only have to do this once.
 
-        if (state.stationIdentifier == null)
-        {
-            // The first step is to take the lat/long and turn it into a grid id.
+        if (findStationIdentifier()) {
 
-            lat = location.latitude
-            lng = location.longitude
-
-            def params1 = [
-                uri: "https://api.weather.gov/points/${lat},${lng}",
-                headers: ['User-Agent':'Hubitat Weather Device', Acccept: 'application/json']
-            ]
-
-            if(logEnable) log.debug "Getting gridpoints: GET ${params1.uri}"
-
-            gridId = ''
-            gridX = -1
-            gridY = -1
-
-            httpGet(params1) {resp ->
-                // NWS sends things back as 'applcation/geo+json' which isn't something the HTTP
-                // stack can automatically parse, so we have to do it on our own.
-                json = resp.data.getText()
-                def slurper = new groovy.json.JsonSlurper()
-                def result = slurper.parseText(json)
-
-                if(logEnable) log.debug "Got response from: ${params1.uri}"
-                if(logEnable) log.debug "Status code: ${resp.status}"
-                if(logEnable) log.debug "Content Type: ${resp.contentType}"
-
-                // Each location is only found within one grid, so if we get a response, we have the answer.
-
-                if(result.properties.gridId != null) {
-                    gridId = result.properties.gridId
-                    gridX = result.properties.gridX
-                    gridY = result.properties.gridY
-                }
-            }
-
-            foundStation = false
-
-            // Once we have a grid, we need to find the weather stations.
-
-            if (gridId != null)
-            {
-                def params2 = [
-                    uri: "https://api.weather.gov/gridpoints/${gridId}/${gridX},${gridY}/stations",
-                    headers: ['User-Agent':'Hubitat Weather Device', Acccept: 'application/json']
-                ]
-
-                if(logEnable) log.debug "Getting stations: GET ${params2.uri}"
-
-                httpGet(params2) {resp ->
-                    // NWS sends things back as 'applcation/geo+json' which isn't something the HTTP
-                    // stack can automatically parse, so we have to do it on our own.
-                    json = resp.data.getText()
-                    def slurper = new groovy.json.JsonSlurper()
-                    def result = slurper.parseText(json)
-
-                    if(logEnable) log.debug "Got response from: ${params2.uri}"
-                    if(logEnable) log.debug "Status code: ${resp.status}"
-                    if(logEnable) log.debug "Content Type: ${resp.contentType}"
-
-                    // To make things simple, we'll pick the first station we find in the list.
-
-                    for (feature in result.features) {
-                        if(feature.properties.stationIdentifier != null) {
-                            state.stationIdentifier = feature.properties.stationIdentifier
-                            if(logEnable) log.debug "Found Weather Station: ${state.stationIdentifier}"
-                            break
-                        }
-                    }
-                }
-            }
-        }
-
-
-        if (state.stationIdentifier != null) {
-            def params3 = [
+            def params = [
                 uri: "https://api.weather.gov/stations/${state.stationIdentifier}/observations",
                 headers: ['User-Agent':'Hubitat Weather Device', Acccept: 'application/json']
             ]
 
             if(logEnable) log.debug "Getting temperature for station: ${state.stationIdentifier}"
-            if(logEnable) log.debug "Getting temperature: GET ${params3.uri}"
+            if(logEnable) log.debug "Getting temperature: GET ${params.uri}"
 
-            httpGet(params3) {resp ->
+            httpGet(params) {resp ->
 
-                // NWS sends things back as 'applcation/geo+json' which isn't something the HTTP
-                // stack can automatically parse, so we have to do it on our own.
-                json = resp.data.getText()
-                def slurper = new groovy.json.JsonSlurper()
-                def result = slurper.parseText(json)
+                def result = parseGeoJSON(resp.data)
 
-                if(logEnable) log.debug "Got response from: ${params3.uri}"
-                if(logEnable) log.debug "Status code: ${resp.status}"
-                if(logEnable) log.debug "Content Type: ${resp.contentType}"
+                logResponse(params.uri, resp)
 
                 // The results are sorted with the most recent reading first, so we'll pick that up.
                 // Sometimes, the temperature value isn't filled in, in which case we move on to the next.
@@ -223,11 +146,94 @@ def poll()  {
     tileMap()
 }
 
-def configure() {
-    poll()
+// Find the station identifier, which is a code that is used to represent
+// a specific NWS weather station in the US.
+//
+def findStationIdentifier() {
+
+    if (state.stationIdentifier != null) {
+        return true
+    }
+
+    // The first step is to take the lat/long and turn it into a grid id.
+
+    lat = location.latitude
+    lng = location.longitude
+
+    def params1 = [
+        uri: "https://api.weather.gov/points/${lat},${lng}",
+        headers: ['User-Agent':'Hubitat Weather Device', Acccept: 'application/json']
+    ]
+
+    if(logEnable) log.debug "Getting gridpoints: GET ${params1.uri}"
+
+    gridId = ''
+    gridX = -1
+    gridY = -1
+
+    httpGet(params1) {resp ->
+        // NWS sends things back as 'applcation/geo+json' which isn't something the HTTP
+        // stack can automatically parse, so we have to do it on our own.
+        def result = parseGeoJSON(resp.data)
+
+        logResponse(params1.uri, resp)
+
+        // Each location is only found within one grid, so if we get a response, we have the answer.
+
+        if(result.properties.gridId != null) {
+            gridId = result.properties.gridId
+            gridX = result.properties.gridX
+            gridY = result.properties.gridY
+        }
+    }
+
+    // Once we have a grid, we need to find the weather stations.
+
+    if (gridId != null)
+    {
+        def params2 = [
+            uri: "https://api.weather.gov/gridpoints/${gridId}/${gridX},${gridY}/stations",
+            headers: ['User-Agent':'Hubitat Weather Device', Acccept: 'application/json']
+        ]
+
+        if(logEnable) log.debug "Getting stations: GET ${params2.uri}"
+
+        httpGet(params2) {resp ->
+
+            def result = parseGeoJSON(resp.data)
+
+            logResponse(params2.uri, resp)
+
+            // To make things simple, I'll just pick the first station I find in the list.
+            // I have no idea how the list is ordered, or how big a grid is. This may not
+            // be a smart choice, but it seems to work for my locations.
+
+            for (feature in result.features) {
+                if(feature.properties.stationIdentifier != null) {
+                    state.stationIdentifier = feature.properties.stationIdentifier
+                    if(logEnable) log.debug "Found Weather Station: ${state.stationIdentifier}"
+                    return true
+                }
+            }
+        }
+    }
+
+    return false
 }
 
-// Round to the nearest tenth. Useful to get more significant digits on the reading
+// The NWS returns the Content-Type header as 'application/geo+json' which isn't
+// something Groovy's HTTP stack handles automatically, so we need to get the body
+// as text and parse it.
+def parseGeoJSON(data) {
+    def json = data.getText()
+    def slurper = new groovy.json.JsonSlurper()
+    return slurper.parseText(json)
+}
+
+
+// Round to the nearest tenth. 
+// Useful to get more significant digits on the reading
+//
 def roundToTenth(x) {
     return ((float)Math.round(x*10.0))/10.0
 }
@@ -254,4 +260,8 @@ def tileMap()  {
     state.appDataToday+= "<tr><td><div style='font-size:.80em;halign=center;'>${roundedTemp}&nbsp;&#186;${location.temperatureScale}</div></td></tr>"
     state.appDataToday+= "</table>"
     sendEvent(name: "Weather", value: state.appDataToday, displayed: true)
+}
+
+def logResponse(uri, resp) {
+    if (logEnable) log.debug "Got response from: ${uri}: Status code: ${resp.status} Content Type: ${resp.contentType}"
 }
