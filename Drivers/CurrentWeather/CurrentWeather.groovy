@@ -71,17 +71,17 @@ metadata {
     }
 }
 
-def installed()  {
-    runEvery1Hour(poll)
-    poll()
-}
-
 def updated()  {
     poll()
 }
 
 def uninstalled()  {
     unschedule()
+}
+
+def installed()  {
+    runEvery1Hour(poll)
+    poll()
 }
 
 def poll()  {
