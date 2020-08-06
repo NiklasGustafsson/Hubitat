@@ -4,7 +4,7 @@
  *  Design Usage:
  *  Retrieve current temperature data from the US National Weather Service. For use with Hubitat dashboards.
  *
- *  Since this is my first Hubitat virtual device, I peaked at the 'Pollen Forecaster' device authored by Bryan Turcotte (@bptworld) when I started this.
+ *  Since this is my first Hubitat virtual device, I peeked at the 'Pollen Forecaster' device authored by Bryan Turcotte (@bptworld) when I started this.
  *  
  * ------------------------------------------------------------------------------------------------------------------------------
  * MIT License
