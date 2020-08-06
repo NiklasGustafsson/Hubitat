@@ -67,6 +67,7 @@ metadata {
 
     preferences {
         input name: "about", type: "paragraph", title: "Current Weather", description: "Retrieve data from the National Weather Service. For use with Hubitat dashboards. Only locations in the United States are currently supported."
+        input name: "station", type: "text", title: "Weather Station Code", required: false, defaultValue: null
         input "logEnable", "bool", title: "Enable logging", required: true, defaultValue: false
     }
 }
@@ -89,20 +90,35 @@ def installed()  {
 }
 
 def poll()  {
+
     if(logEnable) log.debug "In poll..."
+
+    if (state.lastStation != station) {
+        state.stationIdentifier = null
+    }
+
+    if (station != null) {
+        if(logEnable) log.debug "Station '${station}' found in device configuration."
+        state.stationIdentifier = station
+    }
+
+    state.lastStation = station
 
     try {
 
         // If we don't already know the station ID, we must retrieve it. We should only have to do this once.
 
-        if (findStationIdentifier()) {
+        def id = findStationIdentifier()
+
+        if (id != null) {
+            if(logEnable) log.debug "HERE: ${id}"
 
             def params = [
-                uri: "https://api.weather.gov/stations/${state.stationIdentifier}/observations",
+                uri: "https://api.weather.gov/stations/${id}/observations",
                 headers: ['User-Agent':'Hubitat Weather Device', Acccept: 'application/json']
             ]
 
-            if(logEnable) log.debug "Getting temperature for station: ${state.stationIdentifier}"
+            if(logEnable) log.debug "Getting temperature for station: ${id}"
             if(logEnable) log.debug "Getting temperature: GET ${params.uri}"
 
             httpGet(params) {resp ->
@@ -124,7 +140,7 @@ def poll()  {
 
                         def roundedTemp = roundToTenth(state.currentTemperature)
 
-                        log.info "Information for station ${state.stationIdentifier}: weather - ${state.currentWeather} temperature - ${roundedTemp}"
+                        log.info "Information for station ${id}: weather - ${state.currentWeather} temperature - ${roundedTemp}"
 
                         sendEvent(name: "currentWeather", value: state.currentWeather, displayed: true)
                         sendEvent(name: "currentTemperature", value: roundedTemp, displayed: true)
@@ -152,7 +168,7 @@ def poll()  {
 def findStationIdentifier() {
 
     if (state.stationIdentifier != null) {
-        return true
+        return state.stationIdentifier
     }
 
     // The first step is to take the lat/long and turn it into a grid id.
@@ -189,6 +205,8 @@ def findStationIdentifier() {
 
     // Once we have a grid, we need to find the weather stations.
 
+    def stationId = null
+
     if (gridId != null)
     {
         def params2 = [
@@ -212,13 +230,14 @@ def findStationIdentifier() {
                 if(feature.properties.stationIdentifier != null) {
                     state.stationIdentifier = feature.properties.stationIdentifier
                     if(logEnable) log.debug "Found Weather Station: ${state.stationIdentifier}"
-                    return true
+                    stationId = feature.properties.stationIdentifier
+                    break
                 }
             }
         }
     }
 
-    return false
+    return stationId
 }
 
 // The NWS returns the Content-Type header as 'application/geo+json' which isn't
