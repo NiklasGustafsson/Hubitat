@@ -9,6 +9,7 @@
  *
  * Version: 0.1
  * 0.1     (2020-08-28) => First version, based on v0.3 of scoulombe79's driver
+ * 0.2     (2020-12-07) => Added support for dsiplay pn / off
  *
  * Author: NiklasGustafsson (based on scoulombe79's code)
  *
@@ -65,6 +66,7 @@ metadata
         capability "Lock"
         capability "HealthCheck"
         capability "PowerMeter"
+        capability "Switch"
         capability "SwitchLevel"    // Used to set the outdoor temp.
 
         fingerprint manufacturer: "Sinope Technologies", model: "TH1124ZB", deviceJoinName: "Sinope TH1124ZB Thermostat", inClusters: "0000,0003,0004,0005,0201,0204,0402,0B04,0B05,FF01", outClusters: "0019,FF01"
@@ -414,11 +416,6 @@ def setHeatingSetpoint(degrees)
     return cmds
 }
 
-void off()
-{
-    setThermostatMode('off')
-}
-
 void auto()
 {
     setThermostatMode('auto')
@@ -437,6 +434,24 @@ void emergencyHeat()
 void cool()
 {
     setThermostatMode('cool')
+}
+
+void on(){
+    if (settings.trace)
+        log.trace "displayOn() command send"
+    def cmds = []
+    cmds += zigbee.writeAttribute(0x0201, 0x0402, 0x30, 0x0001) // set display brigtness to explicitly on 
+    // Submit zigbee commands    
+    fireCommand(cmds)
+}
+
+void off(){
+    if (settings.trace)
+        log.trace "displayOff() command send"
+    def cmds = []
+     cmds += zigbee.writeAttribute(0x0201, 0x0402, 0x30, 0x0000) // set display brightnes to ambient lighting
+     // Submit zigbee commands    
+    fireCommand(cmds)
 }
 
 def getSupportedThermostatModes()
