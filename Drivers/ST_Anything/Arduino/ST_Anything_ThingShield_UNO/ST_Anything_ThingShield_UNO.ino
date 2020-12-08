@@ -124,13 +124,15 @@ void setup()
   //           "temperature" and one for "humidity")
   //******************************************************************************************
   //Polling Sensors
+
+  const int DELAY = 20000;
   
   //Interrupt Sensors 
-  static st::IS_Contact sensor1(F("contact1"), PIN_CONTACT1, LOW, true, 2000);
-  static st::IS_Contact sensor2(F("contact2"), PIN_CONTACT2, LOW, true, 2000);
-  static st::IS_Contact sensor3(F("contact3"), PIN_CONTACT3, LOW, true, 2000);
-  static st::IS_Contact sensor4(F("contact4"), PIN_CONTACT4, LOW, true, 2000);
-  static st::IS_Motion  sensor5(F("motion1"),  PIN_MOTION1, HIGH, true, 2000);
+  static st::IS_Contact sensor1(F("contact1"), PIN_CONTACT1, LOW, true, DELAY);
+  static st::IS_Contact sensor2(F("contact2"), PIN_CONTACT2, LOW, true, DELAY);
+  static st::IS_Contact sensor3(F("contact3"), PIN_CONTACT3, LOW, true, DELAY);
+  static st::IS_Contact sensor4(F("contact4"), PIN_CONTACT4, LOW, true, DELAY);
+  static st::IS_Motion  sensor5(F("motion1"),  PIN_MOTION1, HIGH, true);
   
   //Executors
   
