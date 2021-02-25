@@ -151,7 +151,60 @@ def refresh() {
         unschedule()
         eventSender("Schedule_Type", "Unscheduled", true)
     }
+
+    updateAvailableRooms()
+
+    // Add new rooms to the list of rooms to clean
+    
+    state.rooms.each { room ->
+
+        def cleanName = room.replace(' ', '_').toLowerCase()
+        def childDevice = null
+        
+        childDevices.each { child ->
+            try{
+                if (child.deviceNetworkId == "${device.id}-${cleanName}") {
+                    childDevice = child
+                }
+            }
+            catch (e) {
+                log.error e
+            }
+        }
+
+        if (childDevice == null)
+        {
+            createChildDevice(room, cleanName)
+        }
+    }
+
+    // Remove devices representing rooms that are no longer available
+    // Disabled for now.
+    
+    // childDevices.each { child ->
+    
+    //     def found = false
+        
+    //     state.rooms.each { room ->
+    //         def cleanName = room.replace(' ', '_').toLowerCase()
+    //         try{
+    //             if (child.deviceNetworkId == "${device.id}-${cleanName}") {
+    //                 found = true
+    //             }
+    //         }
+    //         catch (e) {
+    //             log.error e
+    //         }
+    //     }
+
+    //     if (!found)
+    //     {
+    //         logging("w", "Removing device: ${child.deviceNetworkId}")
+    //         deleteChildDevice(child.deviceNetworkId)
+    //     }
+    // }
 }
+
 def push() {
     grabSharkInfo()
     if (operatingModeValue == 3)
@@ -175,6 +228,10 @@ def off() {
     runDatapointsCmd("SET_Operating_Mode", 3, "POST")
     eventSender("switch","off",true)
     eventSender("Operating_Mode", "Returning to Dock", true)
+    childDevices.each { device -> 
+        logging("d", "Calling sendOffEvent()")
+        device.sendOffEvent() 
+    }
     runIn(10, refresh)
 }
 
@@ -201,18 +258,19 @@ def locate() {
 }
 
 def cleanSpecificRoom(String room) {
-    def pre = "80010bca02170a0b" // Static on all calls
-    def hexstring = room.getBytes().encodeHex() // Converts String to Hex
-    def post = "1a083736413830353841" // Static on all calls
-    String fullstring = pre + hexstring + post
-    def byteArrayForHex = hubitat.helper.HexUtils.hexStringToByteArray(fullstring)
-    def encoded = byteArrayForHex.encodeAsBase64().toString()
-    logging("d", encoded)
-    runDatapointsCmd("SET_Operating_Mode", 2, "POST")
-    runDatapointsCmd("SET_Areas_To_Clean", encoded.toString(), "POST")
-    eventSender("switch","on",true)
-    eventSender("Operating_Mode", "Running", true)
-    runIn(10, refresh)
+    logging("d", "Cleaning: " + room)
+    // def pre = "80010bca02170a0b" // Static on all calls
+    // def hexstring = room.getBytes().encodeHex() // Converts String to Hex
+    // def post = "1a083736413830353841" // Static on all calls
+    // String fullstring = pre + hexstring + post
+    // def byteArrayForHex = hubitat.helper.HexUtils.hexStringToByteArray(fullstring)
+    // def encoded = byteArrayForHex.encodeAsBase64().toString()
+    // logging("d", encoded)
+    // runDatapointsCmd("SET_Operating_Mode", 2, "POST")
+    // runDatapointsCmd("SET_Areas_To_Clean", encoded.toString(), "POST")
+    // eventSender("switch","on",true)
+    // eventSender("Operating_Mode", "Running", true)
+    // runIn(10, refresh)
 }
 
 def cleanRoomGroup1(){
@@ -372,6 +430,18 @@ def grabSharkInfo() {
 
     def date = new Date()
     eventSender("Last_Refreshed", "$date", true)
+}
+
+private void createChildDevice(String deviceName, String cleanName) {
+
+    def deviceHandlerName = "Shark IQ Robot Room Child"
+
+    logging("i", "Creating Child Device: ${deviceName} using the 'Shark IQ Robot Room Child' handler")
+
+    addChildDevice(deviceHandlerName, "${device.id}-${cleanName}",
+        [label: "${device.displayName} (${deviceName})", 
+            isComponent: false, 
+            name: "${deviceName}"])
 }
 
 def initialLogin() {
