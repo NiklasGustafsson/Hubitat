@@ -32,13 +32,10 @@ metadata {
         capability "Momentary"
         command "locate"
         command "pause"
+        command "createRoomDevices"
+        command "deleteMissingRooms"
         command "setPowerMode", [[name:"Set Power Mode to", type: "ENUM",description: "Set Power Mode", constraints: ["Eco", "Normal", "Max"]]]
         command "getRobotInfo", [[name:"Get verbose robot information and push to logs."]]
-        // command "cleanSpecificRoom", [[name:"Clean Specific Room", type: "ENUM",description: "Clean Specific Room", constraints: ["Basement", "Bathroom", "Den", "Dining Room", "Family Room", "Foyer", "Guest Bedroom", "Hallway", "Kitchen", "Laundry Room", "Master Bathroom", "Master Bedroom", "Office", "Playroom" ]]]        
-        // command "updateAvailableRooms"
-        // command "cleanRoomGroup1"
-        // command "cleanRoomGroup2"
-        // command "cleanRoomGroup3"
 
         attribute "Battery_Level", "integer"
         attribute "Operating_Mode", "ENUM"
@@ -63,9 +60,6 @@ metadata {
         input(name: "refreshInterval", type: "integer", title: "Refresh Interval", description: "Number of minutes between Scheduled State Refreshes. Active only if Scheduled State Refresh is turned on.", required: true, displayDuringSetup: true, defaultValue: 1)
         input(name: "smartRefresh", type: "bool", title: "Smart State Refresh", description: "If enabled, will only refresh when vacuum is running (per interval), then every 5 minutes until Fully Charged. After running, polls less frequently or as scheduled through the Shark App. Takes precedence over Scheduled State Refresh.", required: true, displayDuringSetup: true, defaultValue: true)
         input(name: "scheduledTime", type: "time", title: "Scheduled Run Time from Shark App", description: "Enter the time Shark is scheduled to run through the Shark App, blank to disable. Smart State Refresh must be enabled for this to be triggered.", required: false, displayDuringSetup: true, defaultValue: null)
-        // input(name: "roomCleanGroupOne" , type: "string", title:"Room Cleaning Group 1", description: "Enter up to 3 rooms - Comma delimited (eg. 'Basement,Living Room,Bathroom')", required: false, submitOnChange: true)
-        // input(name: "roomCleanGroupTwo" , type: "string", title:"Room Cleaning Group 2", description: "Enter up to 3 rooms - Comma delimited (eg. 'Family Room,Kitchen,Dining Room')", required: false, submitOnChange: true)
-        // input(name: "roomCleanGroupThree" , type: "string", title:"Room Cleaning Group 3", description: "Enter up to 3 rooms - Comma delimited (eg. 'Guest Bedroom,Foyer,Office')", required: false, submitOnChange: true)
         input(name: "googleHomeCompat", type: "bool", title: "Google Home Compatibility", description: "If enabled, Operating Mode will either be docked, returning to dock, running or paused.", defaultValue: false)
         input(name: "debugEnable", type: "bool", title: "Enable Debug Logging", defaultValue: true)
     }
@@ -151,6 +145,9 @@ def refresh() {
         unschedule()
         eventSender("Schedule_Type", "Unscheduled", true)
     }
+}
+
+def createRoomDevices() {
 
     updateAvailableRooms()
 
@@ -177,32 +174,33 @@ def refresh() {
             createChildDevice(room, cleanName)
         }
     }
+}
 
+def deleteMissingRooms() {
     // Remove devices representing rooms that are no longer available
-    // Disabled for now.
     
-    // childDevices.each { child ->
+    childDevices.each { child ->
     
-    //     def found = false
+        def found = false
         
-    //     state.rooms.each { room ->
-    //         def cleanName = room.replace(' ', '_').toLowerCase()
-    //         try{
-    //             if (child.deviceNetworkId == "${device.id}-${cleanName}") {
-    //                 found = true
-    //             }
-    //         }
-    //         catch (e) {
-    //             log.error e
-    //         }
-    //     }
+        state.rooms.each { room ->
+            def cleanName = room.replace(' ', '_').toLowerCase()
+            try{
+                if (child.deviceNetworkId == "${device.id}-${cleanName}") {
+                    found = true
+                }
+            }
+            catch (e) {
+                log.error e
+            }
+        }
 
-    //     if (!found)
-    //     {
-    //         logging("w", "Removing device: ${child.deviceNetworkId}")
-    //         deleteChildDevice(child.deviceNetworkId)
-    //     }
-    // }
+        if (!found)
+        {
+            logging("w", "Removing device: ${child.deviceNetworkId}")
+            deleteChildDevice(child.deviceNetworkId)
+        }
+    }
 }
 
 def push() {

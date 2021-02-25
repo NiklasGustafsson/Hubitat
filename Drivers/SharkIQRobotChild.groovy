@@ -22,7 +22,7 @@ def updated() {
 }
 
 def on() {
-    getParent().cleanSpecificRoom(device.displayName)
+    getParent().cleanSpecificRoom(device.name)
     eventSender("switch", "on", true)
 }
  
