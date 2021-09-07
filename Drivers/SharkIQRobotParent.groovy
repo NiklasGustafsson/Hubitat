@@ -263,12 +263,13 @@ def cleanSpecificRoom(String room) {
     // String fullstring = pre + hexstring + post
     // def byteArrayForHex = hubitat.helper.HexUtils.hexStringToByteArray(fullstring)
     // def encoded = byteArrayForHex.encodeAsBase64().toString()
-    // logging("d", encoded)
-    // runDatapointsCmd("SET_Operating_Mode", 2, "POST")
-    // runDatapointsCmd("SET_Areas_To_Clean", encoded.toString(), "POST")
-    // eventSender("switch","on",true)
-    // eventSender("Operating_Mode", "Running", true)
-    // runIn(10, refresh)
+    def encoded = room //.getBytes().encodeAsBase64().toString()
+    logging("d", encoded)
+    runDatapointsCmd("SET_Operating_Mode", 2, "POST")
+    runDatapointsCmd("SET_Areas_To_Clean", encoded.toString(), "POST")
+    eventSender("switch","on",true)
+    eventSender("Operating_Mode", "Running", true)
+    runIn(10, refresh)
 }
 
 def cleanRoomGroup1(){
@@ -338,6 +339,7 @@ def getRobotInfo(){
 def grabSharkInfo() {
     propertiesResults = runGetPropertiesCmd("names[]=GET_Battery_Capacity&names[]=GET_Recharging_To_Resume&names[]=GET_Charging_Status&names[]=GET_Operating_Mode&names[]=GET_Power_Mode&names[]=GET_RSSI&names[]=GET_Error_Code&names[]=GET_Robot_Volume_Setting&names[]=OTA_FW_VERSION")
     propertiesResults.each { singleProperty ->
+
         if (singleProperty.property.name == "GET_Battery_Capacity")
         {
             eventSender("Battery_Level", "$singleProperty.property.value", true)
