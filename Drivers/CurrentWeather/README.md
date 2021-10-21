@@ -5,3 +5,9 @@ This virtual device retrieve the current weather information from a nearby weath
 The weather information returns temperature and the NWS summary of the weather, along with the NWS icon representing it, which can then be used to display the information in a dashboard.
 
 I believe that the NWS will only have data for US locations.
+
+## Sinope Thermostat Driver
+
+This driver allows setting the outdoor temperature with a 'setLevel()' command.
+
+The code was copied from scoulombe79's initial work on Sinope.
