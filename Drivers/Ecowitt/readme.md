@@ -1,6 +1,8 @@
 ## Ecowitt WiFi Gateway
 *Ecowitt WiFi Gateway driver for Hubitat Elevation*
 
+The Ecowitt part of the Hubitat repo was copied from https://github.com/sburke781/ecowitt and modified.
+
 ### Features
 
 - LAN comunication only, no cloud/weather service needed.
