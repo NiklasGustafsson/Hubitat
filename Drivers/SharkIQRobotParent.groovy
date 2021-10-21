@@ -1,5 +1,5 @@
 /**
- *  Shark IQ Robot v1.0.6
+ *  Shark IQ Robot v1.1.0d
  *
  *  Copyright 2021 Chris Stevens
  *
@@ -26,17 +26,19 @@ import java.text.SimpleDateFormat
 
 metadata {
     definition (name: "Shark IQ Robot", namespace: "cstevens", author: "Chris Stevens", importUrl: "https://raw.githubusercontent.com/TheChrisTech/Hubitat-SharkIQRobot/master/SharkIQRobotDriver.groovy") {
+        capability "Battery"
         capability "Switch"
         capability "Refresh"
         capability "Momentary"
-        capability "Battery"
         command "locate"
         command "pause"
+        command "createRoomDevices"
+        command "deleteMissingRooms"
         command "setPowerMode", [[name:"Set Power Mode to", type: "ENUM",description: "Set Power Mode", constraints: ["Eco", "Normal", "Max"]]]
         command "getRobotInfo", [[name:"Get verbose robot information and push to logs."]]
 
         attribute "Battery_Level", "integer"
-        attribute "Operating_Mode", "text"
+        attribute "Operating_Mode", "ENUM"
         attribute "Power_Mode", "text"
         attribute "Charging_Status", "text"
         attribute "RSSI", "text"
@@ -45,6 +47,7 @@ metadata {
         attribute "Firmware_Version","text"
         attribute "Last_Refreshed","text"
         attribute "Recharging_To_Resume","text"
+        attribute "Available_Rooms","text"
         attribute "Schedule_Type","text"
     }
  
@@ -65,6 +68,12 @@ metadata {
 def refresh() {
     logging("d", "Refresh Triggered.")
     grabSharkInfo()
+    if (device.currentValue('Operating_Mode') == "Returning to Dock")
+    {
+        logging("d", "Operating Mode is 'Returning to Dock'. Scheduling refresh in $refreshInterval seconds.")
+        runIn("$refreshInterval".toInteger(), refresh)
+        return
+    }
     if (smartRefresh && !refreshEnable) 
     {
         if (operatingMode in ["Paused", "Running", "Returning to Dock", "Recharging to Continue"])
@@ -136,8 +145,64 @@ def refresh() {
         unschedule()
         eventSender("Schedule_Type", "Unscheduled", true)
     }
-
 }
+
+def createRoomDevices() {
+
+    updateAvailableRooms()
+
+    // Add new rooms to the list of rooms to clean
+    
+    state.rooms.each { room ->
+
+        def cleanName = room.replace(' ', '_').toLowerCase()
+        def childDevice = null
+        
+        childDevices.each { child ->
+            try{
+                if (child.deviceNetworkId == "${device.id}-${cleanName}") {
+                    childDevice = child
+                }
+            }
+            catch (e) {
+                log.error e
+            }
+        }
+
+        if (childDevice == null)
+        {
+            createChildDevice(room, cleanName)
+        }
+    }
+}
+
+def deleteMissingRooms() {
+    // Remove devices representing rooms that are no longer available
+    
+    childDevices.each { child ->
+    
+        def found = false
+        
+        state.rooms.each { room ->
+            def cleanName = room.replace(' ', '_').toLowerCase()
+            try{
+                if (child.deviceNetworkId == "${device.id}-${cleanName}") {
+                    found = true
+                }
+            }
+            catch (e) {
+                log.error e
+            }
+        }
+
+        if (!found)
+        {
+            logging("w", "Removing device: ${child.deviceNetworkId}")
+            deleteChildDevice(child.deviceNetworkId)
+        }
+    }
+}
+
 def push() {
     grabSharkInfo()
     if (operatingModeValue == 3)
@@ -151,21 +216,25 @@ def push() {
 }
  
 def on() {
-    runPostDatapointsCmd("SET_Operating_Mode", 2)
+    runDatapointsCmd("SET_Operating_Mode", 2, "POST")
     eventSender("switch","on",true)
     eventSender("Operating_Mode", "Running", true)
     runIn(10, refresh)
 }
  
 def off() {
-    runPostDatapointsCmd("SET_Operating_Mode", 3)
+    runDatapointsCmd("SET_Operating_Mode", 3, "POST")
     eventSender("switch","off",true)
     eventSender("Operating_Mode", "Returning to Dock", true)
+    childDevices.each { device -> 
+        logging("d", "Calling sendOffEvent()")
+        device.sendOffEvent() 
+    }
     runIn(10, refresh)
 }
 
 def pause() {
-    runPostDatapointsCmd("SET_Operating_Mode", 0)
+    runDatapointsCmd("SET_Operating_Mode", 0, "POST")
     eventSender("switch","off",true)
     eventSender("Operating_Mode", "Paused", true)
     runIn(10, refresh)
@@ -174,19 +243,48 @@ def pause() {
 def setPowerMode(String powermode) {
     power_modes = ["Normal", "Eco", "Max"]
     powermodeint = power_modes.indexOf(powermode)
-    if (powermodeint >= 0) { runPostDatapointsCmd("SET_Power_Mode", powermodeint) }
+    if (powermodeint >= 0) { runDatapointsCmd("SET_Power_Mode", powermodeint, "POST") }
     runIn(10, refresh)
 }
 
 def locate() {
     logging("d", "Locate Pushed.")
-    runPostDatapointsCmd("SET_Find_Device", 1)
+    runDatapointsCmd("SET_Find_Device", 1, "POST")
     eventSender("Locate", "Active", false)
-    runIn(5, runPostDatapointsCmd("SET_Find_Device", 0))
+    runIn(5, runDatapointsCmd("SET_Find_Device", 0, "POST"))
     runIn(10, refresh)
 }
 
-def getRobotInfo() {
+def cleanSpecificRoom(String room) {
+    logging("d", "Cleaning: " + room)
+    // def pre = "80010bca02170a0b" // Static on all calls
+    // def hexstring = room.getBytes().encodeHex() // Converts String to Hex
+    // def post = "1a083736413830353841" // Static on all calls
+    // String fullstring = pre + hexstring + post
+    // def byteArrayForHex = hubitat.helper.HexUtils.hexStringToByteArray(fullstring)
+    // def encoded = byteArrayForHex.encodeAsBase64().toString()
+    def encoded = room //.getBytes().encodeAsBase64().toString()
+    logging("d", encoded)
+    runDatapointsCmd("SET_Operating_Mode", 2, "POST")
+    runDatapointsCmd("SET_Areas_To_Clean", encoded.toString(), "POST")
+    eventSender("switch","on",true)
+    eventSender("Operating_Mode", "Running", true)
+    runIn(10, refresh)
+}
+
+def cleanRoomGroup1(){
+    cleanSpecificRoom(roomCleanGroupOne)
+}
+
+def cleanRoomGroup2(){
+    cleanSpecificRoom(roomCleanGroupTwo)
+}
+
+def cleanRoomGroup3(){
+    cleanSpecificRoom(roomCleanGroupThree)
+}
+
+def getRobotInfo(){
     propertiesResults = runGetPropertiesCmd("names[]=GET_Main_PCB_BL_Version&names[]=GET_Main_PCB_HW_Version&names[]=GET_Main_PCB_FW_Version&names[]=GET_Nav_Module_FW_Version&names[]=GET_Nav_Module_App_Version&names[]=GET_SCM_FW_Version")
     propertiesResults.each { singleProperty ->
         if (singleProperty.property.name == "GET_Main_PCB_BL_Version")
@@ -216,9 +314,32 @@ def getRobotInfo() {
     }
 }
 
+ def updateAvailableRooms() {
+    logging("d", "Updating Available Rooms")
+    roomInitial = runDatapointsCmd("Mobile_App_Room_Definition", 0, "GET")
+    logging("d", "Grabbed Mobile App Def. $roomInitial")
+    fileToGrab = roomInitial[0].datapoint.file
+    logging("d", "Going to grab this file: $fileToGrab")
+    def url = fileToGrab.toURL()
+    logging("d", "URL Grabbed")
+    def fileResults = url.withInputStream{inputStream->
+        new groovy.json.JsonSlurper().parse(inputStream)
+    }
+    def roomList = []
+    fileResults.goZones.each { singleRoom ->
+        roomList << singleRoom.name
+    }
+    logging("d", "File Parsing Done")
+    roomList.sort()
+    logging("d", "File Sorting Done")
+    eventSender("Avavilable_Rooms", roomList.toString(), true)
+    state.rooms = roomList
+ }
+
 def grabSharkInfo() {
     propertiesResults = runGetPropertiesCmd("names[]=GET_Battery_Capacity&names[]=GET_Recharging_To_Resume&names[]=GET_Charging_Status&names[]=GET_Operating_Mode&names[]=GET_Power_Mode&names[]=GET_RSSI&names[]=GET_Error_Code&names[]=GET_Robot_Volume_Setting&names[]=OTA_FW_VERSION")
     propertiesResults.each { singleProperty ->
+
         if (singleProperty.property.name == "GET_Battery_Capacity")
         {
             eventSender("Battery_Level", "$singleProperty.property.value", true)
@@ -311,13 +432,25 @@ def grabSharkInfo() {
     eventSender("Last_Refreshed", "$date", true)
 }
 
+private void createChildDevice(String deviceName, String cleanName) {
+
+    def deviceHandlerName = "Shark IQ Robot Room Child"
+
+    logging("i", "Creating Child Device: ${deviceName} using the 'Shark IQ Robot Room Child' handler")
+
+    addChildDevice(deviceHandlerName, "${device.id}-${cleanName}",
+        [label: "${device.displayName} (${deviceName})", 
+            isComponent: false, 
+            name: "${deviceName}"])
+}
+
 def initialLogin() {
     login()
     getDevices()
     getUserProfile()
 }
 
-def runPostDatapointsCmd(String operation, Integer operationValue) {
+def runDatapointsCmd(String operation, Object operationValue, String type) {
     initialLogin()
     def localDevicePort = (devicePort==null) ? "80" : devicePort
 	def params = [
@@ -327,7 +460,8 @@ def runPostDatapointsCmd(String operation, Integer operationValue) {
         headers: ["Content-Type": "application/json", "Accept": "*/*", "Authorization": "auth_token $authtoken"],
         body: "{\"datapoint\":{\"value\":\"$operationValue\",\"metadata\":{\"userUUID\":\"$uuid\"}}}"
     ]
-    performHttpPost(params)
+    if (type.toLowerCase() == "post"){ performHttpPost(params) }
+    else if (type.toLowerCase() == "get"){ performHttpGet(params) }
 }
 
 def runGetPropertiesCmd(String operation) {

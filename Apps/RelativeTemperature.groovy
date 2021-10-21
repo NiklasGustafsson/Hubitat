@@ -42,16 +42,18 @@
  *
  */
 
+import java.math.RoundingMode
+
 def setVersion(){
-    state.name = "Sinopé Outdoor Temperature"
+    state.name = "Relative Temperature"
 	state.version = "1.0.0"
 }
 
 definition(
-	name: "Sinopé Outdoor Temperature",
+	name: "Relative Temperature",
 	namespace: "NiklasGustafsson",
 	author: "Niklas Gustafsson",
-	description: "Get the temperature from a device and set the outdoor temp on Sinopé.",
+	description: "Get temperature readings from two devices and set a virtual thermometer to the difference.",
 	category: "Convenience",
 	iconUrl: "",
 	iconX2Url: "",
@@ -74,24 +76,36 @@ def updated() {
 }
 
 def initialize() {
-    subscribe(inputSensors, "temperature", deviceHandler)
+    subscribe(referenceSensor, "temperature", deviceHandler)
+    subscribe(relativeSensor, "temperature", deviceHandler)
     runIn(1, poller)
-    runEvery10Minutes(poller)
 }
 
 def mainPage() {
-    dynamicPage(name: "mainPage") {
+    dynamicPage(name: "mainPage", title: " ", install: true, uninstall: true) {
     	installCheck()
 
-        section("Temperature Sensors") {
-            input "inputSensors", "capability.temperatureMeasurement", title: "Select the temperature sensors", required: true, multiple: true
+        section("") {
+            input "thisName", "text", title: "<b>Name for this relative temperature measurement:</b>", submitOnChange: true
+            if(thisName) {
+                app.updateLabel("$thisName")
+            }
+        }
+        
+        section("<b>Reference Sensor</b>") {
+            input "referenceSensor", "capability.temperatureMeasurement", title: "Select the reference sensor", required: true, multiple: false
         } 
 
-        section("Thermostats") {
-            input "thermostats", "capability.thermostat", title: "Select the thermostats", required: true, multiple: true
+        section("<b>Relative Sensor</b>") {
+            input "relativeSensor", "capability.temperatureMeasurement", title: "Select the relative sensor", required: true, multiple: false
         } 
 
-        section("Preferences") {
+        section("<b>Virtual Sensor</b>") {
+            input "virtualSensor", "capability.temperatureMeasurement", title: "Select the virtual thermometer.", required: true, multiple: false
+        } 
+
+        section("<b>Preferences</b>") {
+            input("interval", "number", title: "Update interval (seconds)", required: false, defaultValue: 3600)
             input("logEnable", "bool", title: "Enable logging", required: false, defaultValue: false)
         } 
 	}
@@ -120,26 +134,24 @@ def getFormat(type, myText="") {			// Modified from @Stephack Code
 def display() {
     setVersion()
     section (getFormat("title", "${state.name}")) {
-		paragraph getFormat("line")
+		// paragraph getFormat("line")
 	}
 }
 
 void poller()
 {
     if(logEnable) log.debug "In poller()"
-    def avgTemp = (float)0.0
+    def diff = (float)0.0
 
-    inputSensors.each{sensor ->
-        def temp = Float.parseFloat(sensor.currentState("temperature").value)
-        if(logEnable) log.debug "temperature: ${temp}"
-        avgTemp += (float)temp
-    }
+    def relTemp = Float.parseFloat(relativeSensor.currentState("temperature").value)
+    def refTemp = Float.parseFloat(referenceSensor.currentState("temperature").value)
+    diff = (float)((int)((relTemp - refTemp) * 100.0)) / 100.0;
 
-    avgTemp = avgTemp / (float)inputSensors.size()
+    if(logEnable) log.debug "relative temperature: ${diff}"
 
-    thermostats.each{therm ->
-        therm.setLevel(avgTemp)
-    }
+    virtualSensor.setTemperature(diff);
+    
+    runIn(interval, poller)
 }
 
 def deviceHandler(evt) 
