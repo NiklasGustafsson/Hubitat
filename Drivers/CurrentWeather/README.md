@@ -6,8 +6,8 @@ The weather information returns temperature and the NWS summary of the weather, 
 
 I believe that the NWS will only have data for US locations.
 
-## Sinope Thermostat Driver
+## Sinopé Thermostat Driver
 
-This driver allows setting the outdoor temperature with a 'setLevel()' command.
+The code was copied from scoulombe79's work on Sinopé and tailored to my specific scenario.
 
-The code was copied from scoulombe79's initial work on Sinope.
+This driver allows setting the outdoor temperature with a 'setLevel()' command. See also the 'Sinopé Outdoor Temperature' app in this repo. They go together -- the app collects (presumably outdoor) temperature readings and sends them to each configured Sinopé thermostat. This has been tested on both the 3kW and the 4kW versions of the Sinopé baseboard thermostat.
