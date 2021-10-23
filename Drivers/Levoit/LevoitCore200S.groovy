@@ -1,3 +1,33 @@
+/* 
+
+MIT License
+
+Copyright (c) Niklas Gustafsson
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+*/
+
+// History:
+// 
+// 2021-10-22: v1.0 Support for Levoit Air Purifier Core 200S / 400S
+
+
 metadata {
     definition(
         name: "Levoit Core200S Air Purifier",
@@ -26,7 +56,6 @@ metadata {
         }
 
     preferences {
-		input("refreshInterval", "number", title: "<font style='font-size:12px; color:#1a77c9'>Refresh Interval</font>", description: "<font style='font-size:12px; font-style: italic'>Poll VeSync status every N seconds</font>", required: true, defaultValue: 30)
         input("debugOutput", "bool", title: "Enable debug logging?", defaultValue: false, required: false)
     }
 }
@@ -73,7 +102,7 @@ def on() {
         setMode(state.mode)
     }
     else {
-        update()
+        update(null)
     }
 }
 
@@ -124,6 +153,15 @@ def setMode(mode) {
     handleMode(mode)
     state.mode = mode
 	device.sendEvent(name: "mode", value: mode)
+    switch(mode)
+    {
+        case "manual":
+            device.sendEvent(name: "speed", value: state.speed)
+            break;
+        case "sleep":
+            device.sendEvent(name: "speed", value: "on")
+            break;
+    }
 }
 
 def setDisplay(displayOn) {
@@ -215,7 +253,9 @@ def update() {
 
     logDebug "update()"
 
-    def result = false
+    def result = null
+
+    def nightLight = parent.getChildDevice(device.cid+"-nl")
 
     parent.sendBypassRequest(device,  [
                 "method": "getPurifierStatus",
@@ -223,42 +263,46 @@ def update() {
             ]) { resp ->
 			if (checkHttpResponse("update", resp))
 			{
-                handleUpdateStatus(resp, null)
+                def status = resp.data.result
+                result = update(status, nightLight)                
 			}
 		}
     return result
 }
 
-private void handleUpdateStatus(resp, data)
+def update(status, nightLight)
 {
-    logDebug "handleUpdateStatus()"
+    logDebug "update(status, nightLight)"
 
-	try
-	{
-        if (checkHttpResponse("handleUpdateStatus", resp))
-        {
-            def status = resp.data.result
+    logDebug status
 
-            logDebug status
+    state.speed = mapIntegerToSpeed(status.result.level)
+    state.mode = status.result.mode
 
-            state.speed = mapIntegerToSpeed(status.result.level)
-            state.mode = status.result.mode
+    device.sendEvent(name: "switch", value: status.result.enabled ? "on" : "off")
+    device.sendEvent(name: "mode", value: status.result.mode)
+    device.sendEvent(name: "filter", value: status.result.filter_life)
 
-            device.sendEvent(name: "switch", value: status.result.enabled ? "on" : "off")
-            device.sendEvent(name: "speed", value: state.speed)
-            device.sendEvent(name: "mode", value: status.result.mode)
-            device.sendEvent(name: "filter", value: status.result.filter_life)
+    switch(state.mode)
+    {
+        case "manual":
+            device.sendEvent(name: "speed", value: mapIntegerToSpeed(status.result.level))
+            break;
+        case "sleep":
+            device.sendEvent(name: "speed", value: "on")
+            break;
+    }
 
-            def html = "Filter: ${status.result.filter_life}%"
-            device.sendEvent(name: "info", value: html)
-        }
-	}
-	catch (e)
-	{
-        logError e.getMessage()
-//		checkHttpResponse("getDevices", e.getMessage())
-	}
+    def html = "Filter: ${status.result.filter_life}%"
+    device.sendEvent(name: "info", value: html)
+
+    if (nightLight != null) {
+        nightLight.update(status)
+    }
+
+    return status
 }
+
 def handleDisplayOn(displayOn) 
 {
     logDebug "handleDisplayOn()"

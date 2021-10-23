@@ -1,3 +1,32 @@
+/* 
+
+MIT License
+
+Copyright (c) Niklas Gustafsson
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+*/
+
+// History:
+// 
+// 2021-10-22: v1.0 Support for Levoit Air Purifier Core 200S / 400S
+
 import java.security.MessageDigest
 
 metadata {
@@ -28,11 +57,15 @@ def installed() {
     updated();
 }
 
-def updated() {
+def updated() { 
 	logDebug "Updated with settings: ${settings}"
-    state.clear()
+    // state.clear()
     unschedule()
 	initialize()
+
+    updateDevices()
+
+    schedule("*/${settings.refreshInterval} * * * * ? *", updateDevices)
 
         // Turn off debug log in 30 minutes
     if (settings?.debugOutput) runIn(1800, logDebugOff);
@@ -108,6 +141,33 @@ private Boolean login()
 	}
 }
 
+def Boolean updateDevices()
+{
+    for (e in state.deviceList) {
+
+        def dni = e.key
+        def configModule = e.value
+
+        if (dni.endsWith("-nl")) continue;
+        
+        logDebug "Updating ${dni}"
+
+        def dev = getChildDevice(dni)
+
+        sendBypassRequest(dev,  [
+            "method": "getPurifierStatus",
+            "source": "APP"
+        ]) { resp ->
+            if (checkHttpResponse("update", resp))
+            {
+                def status = resp.data.result
+
+                result = dev.update(status, getChildDevice(dni+"-nl"))
+            }
+        }
+    }
+}
+
 private Boolean getDevices() {
 
 	def params = [
@@ -144,23 +204,27 @@ private Boolean getDevices() {
 		httpPost(params) { resp ->
 			if (checkHttpResponse("getDevices", resp))
 			{
-                ArrayList<String> newList = []
+                def newList = [:]
 
 				for (device in resp.data.result.list) {
                     logDebug "Device found: ${device.deviceType} / ${device.deviceName} / ${device.macID}"
 
-                    if (device.deviceType == "Core200S" || device.deviceType == "Core400S")
+                    if (device.deviceType == "Core200S")
                     {
-                        newList.add(device.cid);
+                        newList[device.cid] = device.configModule;
+                        newList[device.cid+"-nl"] = device.configModule;
+                    }
+                    else if (device.deviceType == "Core400S") {
+                        newList[device.cid] = device.configModule;
                     }
                 }
-
+                
                 // Remove devices that are no longer present.
 
                 List<com.hubitat.app.ChildDeviceWrapper> list = getChildDevices();
                 if (list) list.each {
                     String dni = it.getDeviceNetworkId();
-                    if (newList.contains(dni) == false) {
+                    if (newList.containsKey(dni) == false) {
                         logDebug "Deleting ${dni}"
                         deleteChildDevice(dni);
                     }
@@ -168,38 +232,48 @@ private Boolean getDevices() {
 
 				for (device in resp.data.result.list) {
                     
-                    com.hubitat.app.ChildDeviceWrapper equip = getChildDevice(device.cid)
+                    com.hubitat.app.ChildDeviceWrapper equip1 = getChildDevice(device.cid)
 
-                    if (equip == null)
+                    if (device.deviceType == "Core200S")
                     {
-                        if (device.deviceType == "Core200S")
+                        def update = null
+
+                        com.hubitat.app.ChildDeviceWrapper equip2 = getChildDevice(device.cid+"-nl")
+
+                        if (equip2 == null)
+                        {
+                            equip2 = addChildDevice("Levoit Core200S Air Purifier Light", device.cid+"-nl", [name: device.deviceName + " Light", label: device.deviceName + " Light", isComponent: false]);                                                    
+                            equip2.updateDataValue("configModule", device.configModule);
+                            equip2.updateDataValue("cid", device.cid);
+                            equip2.updateDataValue("uuid", device.uuid);
+                        }
+
+                        if (equip1 == null)
                         {
                             logDebug "Adding ${device.deviceName}"
-                            equip = addChildDevice("Levoit Core200S Air Purifier", device.cid, [name: device.deviceName, label: device.deviceName, isComponent: false]);                                                    
-                            equip.updateDataValue("configModule", device.configModule);
-                            equip.updateDataValue("uuid", device.uuid);
-                        }
-                        else if (device.deviceType == "Core400S")
-                        {
-                            logDebug "Adding ${device.deviceName}"
-                            equip = addChildDevice("Levoit Core400S Air Purifier", device.cid, [name: device.deviceName, label: device.deviceName, isComponent: false]);                                                    
-                            equip.updateDataValue("configModule", device.configModule);
-                            equip.updateDataValue("uuid", device.uuid);
-                        }
-                    }                
-				}
-
-                for (device in resp.data.result.list) {
-                    
-                    com.hubitat.app.ChildDeviceWrapper equip = getChildDevice(device.cid)
-
-                    if (equip != null)
-                    {
-                        equip.update()
+                            equip1 = addChildDevice("Levoit Core200S Air Purifier", device.cid, [name: device.deviceName, label: device.deviceName, isComponent: false]);                                                    
+                            equip1.updateDataValue("configModule", device.configModule);
+                            equip1.updateDataValue("cid", device.cid);
+                            equip1.updateDataValue("uuid", device.uuid);
+                        }                        
                     }
-                }
+                    else if (device.deviceType == "Core400S")
+                    {
+                        if (equip1 == null)
+                        {
+                            logDebug "Adding ${device.deviceName}"
+                            equip1 = addChildDevice("Levoit Core400S Air Purifier", device.cid, [name: device.deviceName, label: device.deviceName, isComponent: false]);                                                    
+                            equip1.updateDataValue("configModule", device.configModule);
+                            equip1.updateDataValue("cid", device.cid);
+                            equip1.updateDataValue("uuid", device.uuid);
+                        }
+                    }
+				}                
 
                 state.deviceList = newList
+
+                updateDevices()
+
 				result = true
 			}
 		}
@@ -228,7 +302,7 @@ def Boolean sendBypassRequest(equipment, payload, Closure closure)
             "phoneBrand": "SM N9005",
             "phoneOS": "Android",
             "traceId": "1634265366",
-            "cid": equipment.getDeviceNetworkId(),
+            "cid": equipment.getDataValue("cid"),
             "configModule": equipment.getDataValue("configModule"),
             "payload": payload,
             "accountID": getAccountID(),
@@ -248,6 +322,7 @@ def Boolean sendBypassRequest(equipment, payload, Closure closure)
             "accountID": getAccountID(),
             "tk": getAccountToken() ]
 	]
+    
 	try
 	{
 		httpPost(params, closure)

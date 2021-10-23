@@ -1,3 +1,33 @@
+/* 
+
+MIT License
+
+Copyright (c) Niklas Gustafsson
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+*/
+
+// History:
+// 
+// 2021-10-22: v1.0 Support for Levoit Air Purifier Core 200S / 400S
+
+
 metadata {
     definition(
         name: "Levoit Core400S Air Purifier",
@@ -129,19 +159,22 @@ def setSpeed(speed) {
 
 def setMode(mode) {
     logDebug "setMode(${mode})"
+    
     handleMode(mode)
     state.mode = mode
 	handleEvent("mode", mode)
-    if (mode == "auto") {
-	    handleEvent("speed", "auto")
-    }
-    else if (mode == "sleep")
+    
+    switch(mode)
     {
-        handleEvent("speed", "on")
-    }
-    else
-    {
-        handleEvent("speed", state.speed)
+        case "manual":
+            handleEvent("speed",  state.speed)
+            break;
+        case "auto":
+            handleEvent("speed",  "auto")
+            break;
+        case "sleep":
+            handleEvent("speed",  "on")
+            break;
     }
 }
 
@@ -253,7 +286,7 @@ def update() {
 
     logDebug "update()"
 
-    def result = false
+    def result = null
 
     parent.sendBypassRequest(device,  [
                 "method": "getPurifierStatus",
@@ -261,40 +294,40 @@ def update() {
             ]) { resp ->
 			if (checkHttpResponse("update", resp))
 			{
-                handleUpdateStatus(resp, null)
+                def status = resp.data.result
+                result = update(status, null)                
 			}
 		}
     return result
 }
 
-private void handleUpdateStatus(resp, data)
+def update(status, nightLight)
 {
-    logDebug "handleUpdateStatus()"
+    logDebug "update(status, nightLight)"
 
-	try
-	{
-        if (checkHttpResponse("handleUpdateStatus", resp))
-        {
-            def status = resp.data.result
+    logDebug status
 
-            logDebug status
+    state.speed = mapIntegerToSpeed(status.result.level)
+    state.mode = status.result.mode
 
-            state.speed = mapIntegerToSpeed(status.result.level)
-            state.mode = status.result.mode
+    handleEvent("switch", status.result.enabled ? "on" : "off")
+    handleEvent("mode",   status.result.mode)
+    handleEvent("filter", status.result.filter_life)
 
-            handleEvent("switch", status.result.enabled ? "on" : "off")
+    switch(state.mode)
+    {
+        case "manual":
             handleEvent("speed",  mapIntegerToSpeed(status.result.level))
-            handleEvent("mode",   status.result.mode)
-            handleEvent("filter", status.result.filter_life)
+            break;
+        case "auto":
+            handleEvent("speed",  "auto")
+            break;
+        case "sleep":
+            handleEvent("speed",  "on")
+            break;
+    }
 
-            updateAQIandFilter(status.result.air_quality_value.toString(),status.result.filter_life)
-        }
-	}
-	catch (e)
-	{
-        logError e.getMessage()
-//		checkHttpResponse("getDevices", e.getMessage())
-	}
+    updateAQIandFilter(status.result.air_quality_value.toString(),status.result.filter_life)
 }
 
 private void handleEvent(name, val)
