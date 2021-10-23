@@ -146,6 +146,12 @@ def setSpeed(speed) {
         state.speed = speed
         device.sendEvent(name: "speed", value: speed)
     }
+    else if (state.mode == "sleep") {
+        setMode("manual")
+        handleSpeed(speed)
+        state.speed = speed
+        device.sendEvent(name: "speed", value: speed)
+    }
 }
 
 def setMode(mode) {
