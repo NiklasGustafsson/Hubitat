@@ -16,11 +16,11 @@
  * Change Log: shared with ecowitt_gateway.groovy
 */
 
-public static String gitHubUser() { return "sburke781"; }
+public static String gitHubUser() { return "niklasgustafsson"; }
 public static String gitHubRepo() { return "ecowitt"; }
 public static String gitHubBranch() { return "main"; }
 metadata {
-  definition(name: "Ecowitt RF Sensor", namespace: "ecowitt", author: "Simon Burke", importUrl: "https://raw.githubusercontent.com/${gitHubUser()}/${gitHubRepo()}/${gitHubBranch()}/ecowitt_sensor.groovy") {
+  definition(name: "Ecowitt RF Sensor", namespace: "ecowitt", author: "Niklas Gustafsson", importUrl: "https://raw.githubusercontent.com/${gitHubUser()}/${gitHubRepo()}/${gitHubBranch()}/ecowitt_sensor.groovy") {
     capability "Sensor";
 
     capability "Battery";
@@ -128,6 +128,13 @@ metadata {
     attribute "orphanedTemp", "enum", ["false", "true"];       // Whether or not the bundled WH32 is still receiving data from the gateway
     attribute "orphanedRain", "enum", ["false", "true"];       // Whether or not the bundled WH40 is still receiving data from the gateway
     attribute "orphanedWind", "enum", ["false", "true"];       // Whether or not the bundled WH68/WH80 sensor is still receiving data from the gateway    
+
+    attribute "beaufort", "string";
+    attribute "beaufortColor", "string";
+    attribute "speedUnit", "string";
+    attribute "pressureUnit", "string";
+    attribute "rainUnit", "string";
+    attribute "tempUnit", "string";
 
  // command "settingsResetConditional";                        // Used for backward compatibility to reset device conditional preferences
   }
@@ -297,6 +304,12 @@ private BigDecimal convert_hPa_to_inHg(BigDecimal val) {
 
 // ------------------------------------------------------------
 
+private BigDecimal convert_hPa_to_mmHg(BigDecimal val) {
+  return (convert_hPa_to_inHg(val) * 25.4);
+}
+
+// ------------------------------------------------------------
+
 private BigDecimal convert_in_to_mm(BigDecimal val) {
   return (val * 25.4);
 }
@@ -317,6 +330,12 @@ private BigDecimal convert_ft_to_m(BigDecimal val) {
 
 private BigDecimal convert_m_to_ft(BigDecimal val) {
   return (val * 3.28084);
+}
+
+// ------------------------------------------------------------
+
+private BigDecimal convert_mph_to_knots(BigDecimal val) {
+  return (val * 0.86897624);
 }
 
 // ------------------------------------------------------------
@@ -590,6 +609,8 @@ private Boolean attributeUpdateTemperature(String val, String attribTemperature)
     measure = "°C";
   }
 
+  attributeUpdateString(measure, "tempUnit");
+
   return (attributeUpdateNumber(degrees, attribTemperature, measure, decimals));
 }
 
@@ -608,6 +629,8 @@ private Boolean attributeUpdatePressure(String val, String attribPressure, Strin
 
   // Get unit system
   Boolean metric = unitSystemIsMetric();
+
+  Integer unit = (getParent().pressureUnits());
 
   // Get number of decimals (default = 2)
   Integer decimals = settings.decsPressure;
@@ -654,12 +677,21 @@ private Boolean attributeUpdatePressure(String val, String attribPressure, Strin
   BigDecimal relative = absolute * Math.pow(1 - ((altitude * 0.0065) / (temperature + (altitude * 0.0065) + 273.15)), -5.257);
 
   // Convert to imperial if requested
-  if (metric) val = "hPa";
+  if (unit == 1) { 
+    absolute = convert_hPa_to_mmHg(absolute);
+    relative = convert_hPa_to_mmHg(relative);
+    val = "mmHg";
+  }
+  else if (unit == 2) { 
+    val = "hPa";
+  } 
   else {
     absolute = convert_hPa_to_inHg(absolute);
     relative = convert_hPa_to_inHg(relative);
     val = "inHg";
   }
+
+  attributeUpdateString(val, "pressureUnit");
 
   Boolean updated = attributeUpdateNumber(relative, attribPressure, val, decimals);
   if (attributeUpdateNumber(absolute, attribPressureAbs, val, decimals)) updated = true;
@@ -671,15 +703,18 @@ private Boolean attributeUpdatePressure(String val, String attribPressure, Strin
 
 private Boolean attributeUpdateRain(String val, String attribRain, Boolean hour = false) {
 
+  Integer unit = getParent().rainUnits();
+
+  String measure = (unit == 1)? "mm" : "in";
+
   BigDecimal amount = val.toBigDecimal();
-  String measure = hour? "in/h": "in";
 
   // Convert to metric if requested
   if (unitSystemIsMetric()) {
     amount = convert_in_to_mm(amount);
-    measure = hour? "mm/h": "mm";
   }
 
+  attributeUpdateString(measure, "rainUnit");
   return (attributeUpdateNumber(amount, attribRain, measure, 2));
 }
 
@@ -873,15 +908,49 @@ private Boolean attributeUpdateLight(String val, String attribSolarRadiation, St
 private Boolean attributeUpdateWindSpeed(String val, String attribWindSpeed) {
 
   BigDecimal speed = val.toBigDecimal();
-  String measure = "mph";
-
-  // Convert to metric if requested
-  if (unitSystemIsMetric()) {
-    speed = convert_mi_to_km(speed);
-    measure = "km/h";
+  if (attribWindSpeed == "windSpeed") {
+    updateBeaufort(speed);
   }
 
+  Integer unit = (getParent().windSpeedUnits());
+
+  String measure = "m/s"; 
+
+  if (unit == 1) { speed = convert_mi_to_km(speed); measure = "km/h"; }
+  else if (unit == 2) { speed = convert_mi_to_km(speed) / 3.6; }
+  else if (unit == 3) { speed = convert_mph_to_knots(speed) / 3.6; measure = "knots"; }
+  else  { measure = "mph"; }
+
+  attributeUpdateString(measure, "speedUnit");
   return (attributeUpdateNumber(speed, attribWindSpeed, measure, 1));
+}
+
+// ------------------------------------------------------------
+
+private Boolean updateBeaufort(BigDecimal speed)
+{
+  String beaufort = "";
+  String color = "ffffff";
+
+  //
+  // Beaufort wind scale per https://en.wikipedia.org/wiki/Beaufort_scale
+  //
+  if (speed < 0.5) { beaufort = "Calm";  color = "ffffff";}
+  else if (speed < 3.0) { beaufort = "Light Air";  color = "AEF1F9";}
+  else if (speed < 7.0) { beaufort = "Light Breeze";  color = "96F7DC";}
+  else if (speed < 12.0) { beaufort = "Gentle Breeze";  color = "96F7B4";}
+  else if (speed < 18.0) { beaufort = "Moderate Breeze";  color = "6FF46F";}
+  else if (speed < 24.0) { beaufort = "Fresh Breeze";  color = "73ED12";}
+  else if (speed < 31.0) { beaufort = "Strng Breeze";  color = "A4ED12";}
+  else if (speed < 38.0) { beaufort = "High Wind";  color = "DAED12";}
+  else if (speed < 46.0) { beaufort = "Gale";  color = "EDC212";}
+  else if (speed < 54.0) { beaufort = "Strong Gale";  color = "ED8F12";}
+  else if (speed < 63.0) { beaufort = "Storm";  color = "ED6312";}
+  else if (speed < 72.0) { beaufort = "Violent Storm";  color = "ED2912";}
+  else { beaufort = "Hurricane Force";  color = "D5102D";}
+
+  attributeUpdateString(color, "beaufortColor");
+  return (attributeUpdateString(beaufort, "beaufort"));
 }
 
 // ------------------------------------------------------------
@@ -1049,36 +1118,38 @@ private Boolean attributeUpdateSimmerIndex(String val, String attribSimmerIndex,
       }
 
       // Calculate heatIndex based on https://www.vcalc.com/wiki/rklarsen/Summer+Simmer+Index
-      BigDecimal degrees;
 
-      if (temperature < 70) degrees = temperature;
-      else {
-        BigDecimal humidity = val.toBigDecimal();
+      BigDecimal humidity = val.toBigDecimal();
 
-        degrees = 1.98 * (temperature - (0.55 - (0.0055 * humidity)) * (temperature - 58.0)) - 56.83;
-      }
+      BigDecimal degrees = 1.98 * (temperature - (0.55 - (0.0055 * humidity)) * (temperature - 58.0)) - 56.83;
 
       updated = attributeUpdateTemperature(degrees.toString(), attribSimmerIndex);
+
+      logInfo("SSI == " + degrees.toString());
+
+      logInfo("HTML == " + settings.htmlEnabled.toString());
 
       if (settings.htmlEnabled) {
         String danger;
         String color;       
 
-        if (temperature < 70)  {
-          danger = "Cool";
-          color = "ffffff";
-        }
-        else {
-          if      (degrees < 70)  { danger = "Cool";                          color = "ffffff"; }
-          else if (degrees < 77)  { danger = "Slightly Cool";                 color = "0099ff"; }
-          else if (degrees < 83)  { danger = "Comfortable";                   color = "2dca02"; }
-          else if (degrees < 91)  { danger = "Slightly Warm";                 color = "9acd32"; }
-          else if (degrees < 100) { danger = "Increased Discomfort";          color = "ffb233"; }
-          else if (degrees < 112) { danger = "Caution Heat Exhaustion";       color = "ff6600"; }
-          else if (degrees < 125) { danger = "Danger Heatstroke";             color = "ff3300"; }
-          else if (degrees < 150) { danger = "Extreme Danger";                color = "ff0000"; }
-          else                    { danger = "Circulatory Collapse Imminent"; color = "cc3300"; }
-        }
+        if       (degrees < 0 ) { danger = "Frostbite possible";            color = "2d2c52"; }
+        else if (degrees < 21)  { danger = "Unpleasantly Cold";             color = "1f479f"; }
+        else if (degrees < 32)  { danger = "Freezing Cold";                 color = "0c6cb5"; }
+        else if (degrees < 42)  { danger = "Unpleasantly Cool";             color = "2f9fda"; }
+        else if (degrees < 55)  { danger = "Nippy";                         color = "9dc8e6"; } 
+        else if (degrees < 70)  { danger = "Cool";                          color = "ffffff"; }
+        else if (degrees < 77)  { danger = "Slightly Cool";                 color = "0099ff"; }
+        else if (degrees < 83)  { danger = "Comfortable";                   color = "2dca02"; }
+        else if (degrees < 91)  { danger = "Slightly Warm";                 color = "9acd32"; }
+        else if (degrees < 100) { danger = "Increased Discomfort";          color = "ffb233"; }
+        else if (degrees < 112) { danger = "Caution Heat Exhaustion";       color = "ff6600"; }
+        else if (degrees < 125) { danger = "Danger Heatstroke";             color = "ff3300"; }
+        else if (degrees < 150) { danger = "Extreme Danger";                color = "ff0000"; }
+        else                    { danger = "Circulatory Collapse Imminent"; color = "cc3300"; }
+
+        logInfo("danger == " + danger);
+        logInfo("color  == " + color);
 
         if (attributeUpdateString(danger, attribSimmerDanger)) updated = true;
         if (attributeUpdateString(color, attribSimmerColor)) updated = true;
@@ -1521,7 +1592,7 @@ private void htmlDeleteAttributes(String htmlAttrib, Integer count) {
 
 // ------------------------------------------------------------
 
-private Integer htmlValidateTemplate(String htmlTempl, String htmlAttrib, Integer count) {
+private Integer htmlValidateTemplate(String htmlTempl, String htmlAttrib, Integer count, List<String> attribErr) {
   //
   // Return  <0) number of invalid attributes in "htmlTempl"
   //        >=0) number of valid attributes in "htmlTempl"
@@ -1541,7 +1612,6 @@ private Integer htmlValidateTemplate(String htmlTempl, String htmlAttrib, Intege
 
   // Go through all the ${attribute} expressions in the htmlTempl and collect both good and bad ones
   List<String> attribOk = [];
-  List<String> attribErr = [];
 
   htmlTempl.findAll(~pattern) { java.util.ArrayList match ->
     attrib = match[1].trim();
@@ -1645,9 +1715,19 @@ private String htmlUpdateUserInput(String input) {
 
   for (Integer idx = 0; idx < templateList.size(); idx++) {
     // We have valid templates: let's validate them
-    if (htmlValidateTemplate(templateList[idx], htmlAttrib, count) < 1) {
+    List<String> missingAttributes = [];
+    if (htmlValidateTemplate(templateList[idx], htmlAttrib, count, missingAttributes) < 1) {
       // Invalid or no attribute in template
-      return ("Invalid attribute or template for the current sensor");
+      StringBuilder builder = new StringBuilder().append("Invalid template for the current sensor.");
+      if (missingAttributes.size() > 0) {
+          builder.append(" The sensor does not have: ");
+          builder.append("'").append(missingAttributes[0]).append("'");
+          for (Integer err = 1; err < missingAttributes.size(); err++) {
+              builder.append(", ").append("'").append(missingAttributes[err]).append("'");
+          }
+          builder.append(".");
+      }
+      return (builder.toString());
     }
   }
 
@@ -1690,6 +1770,7 @@ void updated() {
     // Clear previous states and sttributes
     state.clear();
     attributeDeleteStale();
+    attributeUpdateRain("0.0", "rainRate", true);
 
     // Pre-process HTML templates (if any)
     String error = htmlUpdateUserInput(settings.htmlTemplate as String);
