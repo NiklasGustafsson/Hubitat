@@ -41,7 +41,7 @@ metadata {
         iconX3Url: "https://s3.amazonaws.com/smartapp-icons/Convenience/Cat-Convenience@2x.png",
         documentationLink: "https://github.com/dcmeglio/hubitat-bond/blob/master/README.md")
         {
-            command "resyncEquipment"
+            capability "Actuator"
         }
 
     preferences {
@@ -65,9 +65,7 @@ def updated() {
 
     updateDevices()
 
-    schedule("*/${settings.refreshInterval} * * * * ? *", updateDevices)
-
-        // Turn off debug log in 30 minutes
+    // Turn off debug log in 30 minutes
     if (settings?.debugOutput) runIn(1800, logDebugOff);
 }
 
@@ -85,7 +83,6 @@ def initialize() {
 
     login()
 }
-
 
 private Boolean login()
 {
@@ -166,6 +163,8 @@ def Boolean updateDevices()
             }
         }
     }
+
+    runIn((int)settings.refreshInterval, updateDevices)
 }
 
 private Boolean getDevices() {
