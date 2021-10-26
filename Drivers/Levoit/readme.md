@@ -19,5 +19,6 @@ Installation:
 
 After installing the drivers, add a virtual device with the VeSync Integration driver, then configure it with your credentials and the desired data refresh internal, and hit 'Save Preferences.' Once that is done, press the 'Resync Equipment' button on the device page and if your credentials are correct, you should see child devices come online. 
 
+The refresh interval determines how often the drivers will poll the status of your equipment. If you are planning on mostly use automation or the Hubitat dashboards to control things, then it can be relatively high.
 
 The Groovy code is loosely based on the Etekcity Python library at: https://github.com/webdjoe/pyvesync
