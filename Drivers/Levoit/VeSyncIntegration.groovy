@@ -210,7 +210,7 @@ private Boolean getDevices() {
 				for (device in resp.data.result.list) {
                     logDebug "Device found: ${device.deviceType} / ${device.deviceName} / ${device.macID}"
 
-                    if (device.deviceType == "Core200S")
+                    if (device.deviceType == "Core200S" || device.deviceType == "LAP-C201S-AUSR")
                     {
                         newList[device.cid] = device.configModule;
                         newList[device.cid+"-nl"] = device.configModule;
@@ -235,7 +235,7 @@ private Boolean getDevices() {
                     
                     com.hubitat.app.ChildDeviceWrapper equip1 = getChildDevice(device.cid)
 
-                    if (device.deviceType == "Core200S")
+                    if (device.deviceType == "Core200S" || device.deviceType == "LAP-C201S-AUSR")
                     {
                         def update = null
 
