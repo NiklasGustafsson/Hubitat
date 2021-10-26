@@ -1,7 +1,7 @@
 /**
  *  Current Temp
  *
- *  Summary:
+ *  Design Usage:
  *  Retrieve current temperature data from the US National Weather Service. For use with Hubitat dashboards.
  *
  *  Since this is my first Hubitat virtual device, I peeked at the 'Pollen Forecaster' device authored by Bryan Turcotte (@bptworld) when I started this.
@@ -33,6 +33,7 @@
  *
  *  Changes:
  *
+ * v0.1.1 - 10/24/2021 - Updated degree unit identifier
  * v0.1.0 - 08/05/2020 - Original version
  *
  */
@@ -259,7 +260,7 @@ def roundToTenth(x) {
 
 def convertToTempScale(temp) {
     x = temp.value
-    isCelsius = temp.unitCode == "unit:degC"
+    isCelsius = temp.unitCode == "wmoUnit:degC"
 
     if (location.temperatureScale == "C") {
         return isCelsius ? x : (x - 32.0) / 1.8
@@ -275,8 +276,8 @@ def tileMap()  {
     state.appDataToday = "<table width='100%'>"
     state.appDataToday+= "<tr><td><div style=''font-size:.80em;halign=center;'></div></td></tr>"
     state.appDataToday+= "<tr><td><div style=''font-size:.80em;halign=center;'><img src='${state.icon}'/></div></td></tr>"
-    state.appDataToday+= "<tr><td><div style='font-size:.80em;halign=center;'>${state.currentWeather}</div></td></tr>"
-    state.appDataToday+= "<tr><td><div style='font-size:.80em;halign=center;'>${roundedTemp}&nbsp;&#186;${location.temperatureScale}</div></td></tr>"
+    state.appDataToday+= "<tr><td><div style='font-size:.80em;halign=center;'>${state.currentWeather}&nbsp;/&nbsp;"
+    state.appDataToday+= "${roundedTemp}&nbsp;&#186;${location.temperatureScale}</div></td></tr>"
     state.appDataToday+= "</table>"
     sendEvent(name: "Weather", value: state.appDataToday, displayed: true)
 }
