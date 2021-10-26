@@ -15,4 +15,9 @@ There are four files to install, all as Hubitat drivers. Copy and paste into the
 3. LevoitCore200S Light.groovy -- the driver for the 200S night light.
 4. LevoitCore400S.groovy -- the driver for the 400S purifier.
 
+Installation:
+
+After installing the drivers, add a virtual device with the VeSync Integration driver, then configure it with your credentials and the desired data refresh internal, and hit 'Save Preferences.' Once that is done, press the 'Resync Equipment' button on the device page and if your credentials are correct, you should see child devices come online. 
+
+
 The Groovy code is loosely based on the Etekcity Python library at: https://github.com/webdjoe/pyvesync
