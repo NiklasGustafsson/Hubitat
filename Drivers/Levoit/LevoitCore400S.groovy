@@ -60,7 +60,6 @@ metadata {
         }
 
     preferences {
-		input("refreshInterval", "number", title: "<font style='font-size:12px; color:#1a77c9'>Refresh Interval</font>", description: "<font style='font-size:12px; font-style: italic'>Poll VeSync status every N seconds</font>", required: true, defaultValue: 30)
         input("debugOutput", "bool", title: "Enable debug logging?", defaultValue: false, required: false)
     }
 }
@@ -353,33 +352,39 @@ private void updateAQIandFilter(String val, filter) {
 
     BigDecimal aqi;
 
-    if      (pm <  12.1) aqi = convertRange(pm,   0.0,  12.0,   0,  50);
-    else if (pm <  35.5) aqi = convertRange(pm,  12.1,  35.4,  51, 100);
-    else if (pm <  55.5) aqi = convertRange(pm,  35.5,  55.4, 101, 150);
-    else if (pm < 150.5) aqi = convertRange(pm,  55.5, 150.4, 151, 200);
-    else if (pm < 250.5) aqi = convertRange(pm, 150.5, 250.4, 201, 300);
-    else if (pm < 350.5) aqi = convertRange(pm, 250.5, 350.4, 301, 400);
-    else                 aqi = convertRange(pm, 350.5, 500.4, 401, 500);
+    if (state.prevPM == null || state.prevPM != pm || state.prevFilter == null || state.prevFilter != filter) {
 
-    handleEvent("AQI", aqi);
+        state.prevPM = pm;
+        state.prevFilter = filter;
 
-    String danger;
-    String color;
+        if      (pm <  12.1) aqi = convertRange(pm,   0.0,  12.0,   0,  50);
+        else if (pm <  35.5) aqi = convertRange(pm,  12.1,  35.4,  51, 100);
+        else if (pm <  55.5) aqi = convertRange(pm,  35.5,  55.4, 101, 150);
+        else if (pm < 150.5) aqi = convertRange(pm,  55.5, 150.4, 151, 200);
+        else if (pm < 250.5) aqi = convertRange(pm, 150.5, 250.4, 201, 300);
+        else if (pm < 350.5) aqi = convertRange(pm, 250.5, 350.4, 301, 400);
+        else                 aqi = convertRange(pm, 350.5, 500.4, 401, 500);
 
-    if      (aqi <  51) { danger = "Good";                           color = "7e0023"; }
-    else if (aqi < 101) { danger = "Moderate";                       color = "fff300"; }
-    else if (aqi < 151) { danger = "Unhealthy for Sensitive Groups"; color = "f18b00"; }
-    else if (aqi < 201) { danger = "Unhealthy";                      color = "e53210"; }
-    else if (aqi < 301) { danger = "Very Unhealthy";                 color = "b567a4"; }
-    else if (aqi < 401) { danger = "Hazardous";                      color = "7e0023"; }
-    else {                danger = "Hazardous";                      color = "7e0023"; }
+        handleEvent("AQI", aqi);
 
-    handleEvent("aqiColor", color)
-    handleEvent("aqiDanger", danger)
+        String danger;
+        String color;
 
-    def html = "AQI: ${aqi}<br>PM2.5: ${pm} &micro;g/m&sup3;<br>Filter: ${filter}%"
+        if      (aqi <  51) { danger = "Good";                           color = "7e0023"; }
+        else if (aqi < 101) { danger = "Moderate";                       color = "fff300"; }
+        else if (aqi < 151) { danger = "Unhealthy for Sensitive Groups"; color = "f18b00"; }
+        else if (aqi < 201) { danger = "Unhealthy";                      color = "e53210"; }
+        else if (aqi < 301) { danger = "Very Unhealthy";                 color = "b567a4"; }
+        else if (aqi < 401) { danger = "Hazardous";                      color = "7e0023"; }
+        else {                danger = "Hazardous";                      color = "7e0023"; }
 
-    handleEvent("info", html)
+        handleEvent("aqiColor", color)
+        handleEvent("aqiDanger", danger)
+
+        def html = "AQI: ${aqi}<br>PM2.5: ${pm} &micro;g/m&sup3;<br>Filter: ${filter}%"
+
+        handleEvent("info", html)
+    }
 }
 
 private BigDecimal convertRange(BigDecimal val, BigDecimal inMin, BigDecimal inMax, BigDecimal outMin, BigDecimal outMax, Boolean returnInt = true) {

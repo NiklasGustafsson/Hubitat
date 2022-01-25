@@ -258,7 +258,7 @@ private Boolean getDevices() {
                             equip1.updateDataValue("uuid", device.uuid);
                         }                        
                     }
-                    else if (device.deviceType == "Core400S")
+                    else if (device.deviceType == "Core400S" || device.deviceType == "Core300S")
                     {
                         if (equip1 == null)
                         {
