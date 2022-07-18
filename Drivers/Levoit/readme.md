@@ -8,14 +8,14 @@ When discovered, a Core 200S purifier  will result in two devices being installe
 
 The purifiers show up as fans, switches, and dimmers. And there's also an 'info' attribute that is useful for displaying in a dashboard tile as HTML. The child devices are actuators, so their public methods may be invoked from rules.
 
-There are four files to install, all as Hubitat drivers. Copy and paste into the Hubitat UI under driver code.
+There are six files to install, all as Hubitat drivers. Copy and paste into the Hubitat UI under driver code. Remember to use the 'Raw' view of the code in GitHub before copying. You only need to install drivers for the kinds of devices you have, plus the integration driver, which is the parent device. Not that the 200S requires two drivers, since there's a nigh light to control.
 
-1. VeSyncIntegration.groovy -- this is the parent device. It represents the VeSync account. Configure with account email and password, plus a refresh (polling) interval.
+1. VeSyncIntegration.groovy -- this is the parent device. It represents the VeSync account.<br/> Configure with account email and password, plus a refresh (polling) interval.
 2. LevoitCore200S.groovy -- the driver for the 200S purifier.
 3. LevoitCore200S Light.groovy -- the driver for the 200S night light.
 4. LevoitCore400S.groovy -- the driver for the 300S purifier.
-4. LevoitCore400S.groovy -- the driver for the 400S purifier.
-4. LevoitCore600S.groovy -- the driver for the 600S purifier.
+5. LevoitCore400S.groovy -- the driver for the 400S purifier.
+6. LevoitCore600S.groovy -- the driver for the 600S purifier.
 
 Installation:
 
