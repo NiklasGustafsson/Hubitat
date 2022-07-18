@@ -33,10 +33,10 @@ SOFTWARE.
 
 metadata {
     definition(
-        name: "Levoit Core200S Air Purifier",
+        name: "Levoit Core300S Air Purifier",
         namespace: "NiklasGustafsson",
-        author: "Niklas Gustafsson",
-        description: "Supports controlling the Levoit 200S / 300S air purifiers",
+        author: "Niklas Gustafsson and elfege (contributor)",
+        description: "Supports controlling the Levoit 300S air purifier",
         category: "My Apps",
         iconUrl: "https://s3.amazonaws.com/smartapp-icons/Convenience/Cat-Convenience.png",
         iconX2Url: "https://s3.amazonaws.com/smartapp-icons/Convenience/Cat-Convenience@2x.png",
@@ -44,18 +44,22 @@ metadata {
         documentationLink: "https://github.com/dcmeglio/hubitat-bond/blob/master/README.md")
         {
             capability "Switch"
-            capability "SwitchLevel"
             capability "FanControl"
             capability "Actuator"
+            capability "SwitchLevel"
 
             attribute "filter", "number";                              // Filter status (0-100%)
             attribute "mode", "string";                                // Purifier mode 
+
+            attribute "aqi", "number";                                 // AQI (0-500)
+            attribute "aqiDanger", "string";                           // AQI danger level
+            attribute "aqiColor", "string";                            // AQI HTML color
             
             attribute "info", "string";                               // HTML
 
             command "setDisplay", [[name:"Display*", type: "ENUM", description: "Display", constraints: ["on", "off"] ] ]
-            command "setSpeed", [[name:"Speed*", type: "ENUM", description: "Speed", constraints: ["off", "low", "medium", "high"] ] ]
-            command "setMode",  [[name:"Mode*", type: "ENUM", description: "Mode", constraints: ["manual", "sleep"] ] ]
+            command "setSpeed", [[name:"Speed*", type: "ENUM", description: "Speed", constraints: ["off", "sleep", "auto", "low", "medium", "high"] ] ]
+            command "setMode",  [[name:"Mode*", type: "ENUM", description: "Mode", constraints: ["manual", "sleep", "auto"] ] ]
             command "toggle"
         }
 
@@ -71,7 +75,6 @@ def installed() {
 
 def updated() {
 	logDebug "Updated with settings: ${settings}"
-
     state.clear()
     unschedule()
 	initialize()
@@ -93,7 +96,7 @@ def initialize() {
 def on() {
     logDebug "on()"
 	handlePower(true)
-    device.sendEvent(name: "switch", value: "on")
+    handleEvent("switch", "on")
 
 	if (state.speed != null) {
         setSpeed(state.speed)
@@ -106,14 +109,15 @@ def on() {
         setMode(state.mode)
     }
     else {
-        update(null)
+        update()
     }
 }
 
 def off() {
     logDebug "off()"
 	handlePower(false)
-    device.sendEvent(name: "switch", value: "off")
+    handleEvent("switch", "off")
+    handleEvent("speed", "off")
 }
 
 def toggle() {
@@ -127,8 +131,20 @@ def toggle() {
 def cycleSpeed() {
     logDebug "cycleSpeed()"
 
-    def speed = (state.speed == "low") ? "medium" : ( (state.speed == "medium") ? "high" : "low")
-    
+    def speed = "low";
+
+    switch(state.speed) {
+        case "low":
+            speed = "medium";
+            break;
+        case "medium":
+            speed = "high";
+            break;
+        case "high":
+            speed = "low";
+            break;
+    }
+
     if (state.switch == "off")
     {
         on()
@@ -155,14 +171,19 @@ def setSpeed(speed) {
     if (speed == "off") {
         off()
     }
+    else if (speed == "auto") {
+        setMode(speed)
+        state.speed = speed
+        handleEvent("speed", speed)
+    }
     else if (speed == "sleep") {
         setMode(speed)
-        device.sendEvent(name: "speed", value: "on")
+        handleEvent("speed", "on")
     }
     else if (state.mode == "manual") {
         handleSpeed(speed)
         state.speed = speed
-        device.sendEvent(name: "speed", value: speed)
+        handleEvent("speed", speed)
     }
     else if (state.mode == "sleep") {
         setMode("manual")
@@ -174,16 +195,21 @@ def setSpeed(speed) {
 
 def setMode(mode) {
     logDebug "setMode(${mode})"
+    
     handleMode(mode)
     state.mode = mode
-	device.sendEvent(name: "mode", value: mode)
+	handleEvent("mode", mode)
+    
     switch(mode)
     {
         case "manual":
-            device.sendEvent(name: "speed", value: state.speed)
+            handleEvent("speed",  state.speed)
+            break;
+        case "auto":
+            handleEvent("speed",  "auto")
             break;
         case "sleep":
-            device.sendEvent(name: "speed", value: "on")
+            handleEvent("speed",  "on")
             break;
     }
 }
@@ -194,21 +220,48 @@ def setDisplay(displayOn) {
 }
 
 def mapSpeedToInteger(speed) {
-    return (speed == "low") ? 1 : ( (speed == "medium") ? 2 : 3)
+    switch(speed)
+    {
+        case "1":
+        case "low":
+            return 1;
+        case "2":
+        case "medium":
+            return 2;
+    }
+    return 3;
 }
 
 def mapIntegerStringToSpeed(speed) {
-    return (speed == "1") ? "low" : ( (speed == "2") ? "medium" : "high")
+    switch(speed)
+    {
+        case "1":
+            return "low";
+        case "2":
+            return "medium";
+    }
+    return "high";
 }
 
 def mapIntegerToSpeed(speed) {
-    return (speed == 1) ? "low" : ( (speed == 2) ? "medium" : "high")
+    switch(speed)
+    {
+        case 1:
+            return "low";
+        case 2:
+            return "medium";
+    }
+    return "high";
 }
 
 def logDebug(msg) {
     if (settings?.debugOutput) {
 		log.debug msg
 	}
+}
+
+def logError(msg) {
+    log.error msg
 }
 
 void logDebugOff() {
@@ -279,8 +332,6 @@ def update() {
 
     def result = null
 
-    def nightLight = parent.getChildDevice(device.cid+"-nl")
-
     parent.sendBypassRequest(device,  [
                 "method": "getPurifierStatus",
                 "source": "APP"
@@ -288,7 +339,7 @@ def update() {
 			if (checkHttpResponse("update", resp))
 			{
                 def status = resp.data.result
-                result = update(status, nightLight)                
+                result = update(status, null)                
 			}
 		}
     return result
@@ -303,28 +354,94 @@ def update(status, nightLight)
     state.speed = mapIntegerToSpeed(status.result.level)
     state.mode = status.result.mode
 
-    device.sendEvent(name: "switch", value: status.result.enabled ? "on" : "off")
-    device.sendEvent(name: "mode", value: status.result.mode)
-    device.sendEvent(name: "filter", value: status.result.filter_life)
+    handleEvent("switch", status.result.enabled ? "on" : "off")
+    handleEvent("mode",   status.result.mode)
+    handleEvent("filter", status.result.filter_life)
 
     switch(state.mode)
     {
         case "manual":
-            device.sendEvent(name: "speed", value: mapIntegerToSpeed(status.result.level))
+            handleEvent("speed",  mapIntegerToSpeed(status.result.level))
+            break;
+        case "auto":
+            handleEvent("speed",  "auto")
             break;
         case "sleep":
-            device.sendEvent(name: "speed", value: "on")
+            handleEvent("speed",  "on")
             break;
     }
 
-    def html = "Filter: ${status.result.filter_life}%"
-    device.sendEvent(name: "info", value: html)
+    updateAQIandFilter(status.result.air_quality_value.toString(),status.result.filter_life)
+}
 
-    if (nightLight != null) {
-        nightLight.update(status)
+private void handleEvent(name, val)
+{
+    logDebug "handleEvent(${name}, ${val})"
+    device.sendEvent(name: name, value: val)
+}
+
+private void updateAQIandFilter(String val, filter) {
+
+    logDebug "updateAQI(${val})"
+
+    //
+    // Conversions based on https://en.wikipedia.org/wiki/Air_quality_index
+    //
+    BigDecimal pm = val.toBigDecimal();
+
+    BigDecimal aqi;
+
+    if (state.prevPM == null || state.prevPM != pm || state.prevFilter == null || state.prevFilter != filter) {
+
+        state.prevPM = pm;
+        state.prevFilter = filter;
+
+        if      (pm <  12.1) aqi = convertRange(pm,   0.0,  12.0,   0,  50);
+        else if (pm <  35.5) aqi = convertRange(pm,  12.1,  35.4,  51, 100);
+        else if (pm <  55.5) aqi = convertRange(pm,  35.5,  55.4, 101, 150);
+        else if (pm < 150.5) aqi = convertRange(pm,  55.5, 150.4, 151, 200);
+        else if (pm < 250.5) aqi = convertRange(pm, 150.5, 250.4, 201, 300);
+        else if (pm < 350.5) aqi = convertRange(pm, 250.5, 350.4, 301, 400);
+        else                 aqi = convertRange(pm, 350.5, 500.4, 401, 500);
+
+        handleEvent("AQI", aqi);
+
+        String danger;
+        String color;
+
+        if      (aqi <  51) { danger = "Good";                           color = "7e0023"; }
+        else if (aqi < 101) { danger = "Moderate";                       color = "fff300"; }
+        else if (aqi < 151) { danger = "Unhealthy for Sensitive Groups"; color = "f18b00"; }
+        else if (aqi < 201) { danger = "Unhealthy";                      color = "e53210"; }
+        else if (aqi < 301) { danger = "Very Unhealthy";                 color = "b567a4"; }
+        else if (aqi < 401) { danger = "Hazardous";                      color = "7e0023"; }
+        else {                danger = "Hazardous";                      color = "7e0023"; }
+
+        handleEvent("aqiColor", color)
+        handleEvent("aqiDanger", danger)
+
+        def html = "AQI: ${aqi}<br>PM2.5: ${pm} &micro;g/m&sup3;<br>Filter: ${filter}%"
+
+        handleEvent("info", html)
     }
+}
 
-    return status
+private BigDecimal convertRange(BigDecimal val, BigDecimal inMin, BigDecimal inMax, BigDecimal outMin, BigDecimal outMax, Boolean returnInt = true) {
+  // Let make sure ranges are correct
+  assert (inMin <= inMax);
+  assert (outMin <= outMax);
+
+  // Restrain input value
+  if (val < inMin) val = inMin;
+  else if (val > inMax) val = inMax;
+
+  val = ((val - inMin) * (outMax - outMin)) / (inMax - inMin) + outMin;
+  if (returnInt) {
+    // If integer is required we use the Float round because the BigDecimal one is not supported/not working on Hubitat
+    val = val.toFloat().round().toBigDecimal();
+  }
+
+  return (val);
 }
 
 def handleDisplayOn(displayOn) 
@@ -346,7 +463,6 @@ def handleDisplayOn(displayOn)
 		}
     return result
 }
-
 
 def checkHttpResponse(action, resp) {
 	if (resp.status == 200 || resp.status == 201 || resp.status == 204)

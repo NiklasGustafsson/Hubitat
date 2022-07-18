@@ -25,6 +25,9 @@ SOFTWARE.
 
 // History:
 // 
+// 2022-07-18: v1.1 Support for Levoit Air Purifier Core 600S.
+//                  Split into separate files for each device.
+//                  Support for 'SwitchLevel' capability.
 // 2021-10-22: v1.0 Support for Levoit Air Purifier Core 200S / 400S
 
 
@@ -32,7 +35,7 @@ metadata {
     definition(
         name: "Levoit Core400S Air Purifier",
         namespace: "NiklasGustafsson",
-        author: "Niklas Gustafsson",
+        author: "Niklas Gustafsson and elfege (contributor)",
         description: "Supports controlling the Levoit 400S air purifier",
         category: "My Apps",
         iconUrl: "https://s3.amazonaws.com/smartapp-icons/Convenience/Cat-Convenience.png",
@@ -43,6 +46,7 @@ metadata {
             capability "Switch"
             capability "FanControl"
             capability "Actuator"
+            capability "SwitchLevel"
 
             attribute "filter", "number";                              // Filter status (0-100%)
             attribute "mode", "string";                                // Purifier mode 
@@ -54,7 +58,7 @@ metadata {
             attribute "info", "string";                               // HTML
 
             command "setDisplay", [[name:"Display*", type: "ENUM", description: "Display", constraints: ["on", "off"] ] ]
-            command "setSpeed", [[name:"Speed*", type: "ENUM", description: "Speed", constraints: ["off", "sleep", "auto", "low", "medium", "high"] ] ]
+            command "setSpeed", [[name:"Speed*", type: "ENUM", description: "Speed", constraints: ["off", "sleep", "auto", "low", "medium", "high", "max"] ] ]
             command "setMode",  [[name:"Mode*", type: "ENUM", description: "Mode", constraints: ["manual", "sleep", "auto"] ] ]
             command "toggle"
         }
@@ -126,12 +130,43 @@ def toggle() {
 
 def cycleSpeed() {
     logDebug "cycleSpeed()"
-    def speed = (state.speed == "low") ? "medium" : ( (state.speed == "medium") ? "high" : "low")
-    
+
+    def speed = "low";
+
+    switch(state.speed) {
+        case "low":
+            speed = "medium";
+            break;
+        case "medium":
+            speed = "high";
+            break;
+        case "high":
+            speed = "max";
+            break;
+        case "max":
+            speed = "low";
+            break;
+    }
+
     if (state.switch == "off")
     {
         on()
     }
+    setSpeed(speed)
+}
+
+def setLevel(value)
+{
+    logDebug "setLevel $value"
+    def speed = 0
+    setMode("manual") // always manual if setLevel() cmd was called
+
+    if(value < 25) speed = 1
+    if(value >= 25 && value < 50) speed = 2
+    if(value >= 50 && value < 75) speed = 3
+    if(value >= 75) speed = 4
+    
+    sendEvent(name: "level", value: value)
     setSpeed(speed)
 }
 
@@ -200,19 +235,34 @@ def mapSpeedToInteger(speed) {
         case "3":
         case "high":
             return 3;
-        case "4":
-            return 4;
-
     }
-    return (speed == "low") ? 1 : ( (speed == "medium") ? 2 : 3)
+    return 4;
 }
 
 def mapIntegerStringToSpeed(speed) {
-    return (speed == "1") ? "low" : ( (speed == "2") ? "medium" : "high")
+    switch(speed)
+    {
+        case "1":
+            return "low";
+        case "2":
+            return "medium";
+        case "3":
+            return "high";
+    }
+    return "max";
 }
 
 def mapIntegerToSpeed(speed) {
-    return (speed == 1) ? "low" : ( (speed == 2) ? "medium" : "high")
+    switch(speed)
+    {
+        case 1:
+            return "low";
+        case 2:
+            return "medium";
+        case 3:
+            return "high";
+    }
+    return "max";
 }
 
 def logDebug(msg) {

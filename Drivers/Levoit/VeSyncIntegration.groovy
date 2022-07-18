@@ -25,6 +25,9 @@ SOFTWARE.
 
 // History:
 // 
+// 2022-07-18: v1.1 Support for Levoit Air Purifier Core 600S.
+//                  Split into separate files for each device.
+//                  Support for 'SwitchLevel' capability.
 // 2021-10-22: v1.0 Support for Levoit Air Purifier Core 200S / 400S
 
 import java.security.MessageDigest
@@ -33,7 +36,7 @@ metadata {
     definition(
         name: "VeSync Integration",
         namespace: "NiklasGustafsson",
-        author: "Niklas Gustafsson",
+        author: "Niklas Gustafsson and elfege (contributor)",
         description: "Integrates VeSync devices with Hubitat Elevation",
         category: "My Apps",
         iconUrl: "https://s3.amazonaws.com/smartapp-icons/Convenience/Cat-Convenience.png",
@@ -215,7 +218,7 @@ private Boolean getDevices() {
                         newList[device.cid] = device.configModule;
                         newList[device.cid+"-nl"] = device.configModule;
                     }
-                    else if (device.deviceType == "Core400S") {
+                    else if (device.deviceType == "Core400S" || device.deviceType == "Core300S" || device.deviceType == "LAP-C601S-WUS") {
                         newList[device.cid] = device.configModule;
                     }
                 }
@@ -256,9 +259,30 @@ private Boolean getDevices() {
                             equip1.updateDataValue("configModule", device.configModule);
                             equip1.updateDataValue("cid", device.cid);
                             equip1.updateDataValue("uuid", device.uuid);
+                        }
+                        else {
+                            // In case the device name has changed.
+                            equip1.name = device.deviceName;
+                            equip1.label = device.deviceName;
                         }                        
                     }
-                    else if (device.deviceType == "Core400S" || device.deviceType == "Core300S")
+                    else if (device.deviceType == "Core300S")
+                    {
+                        if (equip1 == null)
+                        {
+                            logDebug "Adding ${device.deviceName}"
+                            equip1 = addChildDevice("Levoit Core300S Air Purifier", device.cid, [name: device.deviceName, label: device.deviceName, isComponent: false]);                                                    
+                            equip1.updateDataValue("configModule", device.configModule);
+                            equip1.updateDataValue("cid", device.cid);
+                            equip1.updateDataValue("uuid", device.uuid);
+                        }
+                        else {
+                            // In case the device name has changed.
+                            equip1.name = device.deviceName;
+                            equip1.label = device.deviceName;
+                        }                        
+                    }
+                    else if (device.deviceType == "Core400S")
                     {
                         if (equip1 == null)
                         {
@@ -268,6 +292,27 @@ private Boolean getDevices() {
                             equip1.updateDataValue("cid", device.cid);
                             equip1.updateDataValue("uuid", device.uuid);
                         }
+                        else {
+                            // In case the device name has changed.
+                            equip1.name = device.deviceName;
+                            equip1.label = device.deviceName;
+                        }                        
+                    }
+                    else if (device.deviceType == "LAP-C601S-WUS")
+                    {
+                        if (equip1 == null)
+                        {
+                            logDebug "Adding ${device.deviceName}"
+                            equip1 = addChildDevice("Levoit Core600S Air Purifier", device.cid, [name: device.deviceName, label: device.deviceName, isComponent: false]);                                                    
+                            equip1.updateDataValue("configModule", device.configModule);
+                            equip1.updateDataValue("cid", device.cid);
+                            equip1.updateDataValue("uuid", device.uuid);
+                        }
+                        else {
+                            // In case the device name has changed.
+                            equip1.name = device.deviceName;
+                            equip1.label = device.deviceName;
+                        }                        
                     }
 				}                
 
