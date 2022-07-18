@@ -1,0 +1,51 @@
+{
+  "packageName": "Levoit Air Purifiers",
+  "author": "Niklas Gustafsson",
+  "version": "1.1",
+  "minimumHEVersion": "2.3.2",
+  "dateReleased": "2022-07-18",
+  "drivers": [
+    {
+      "id": "e55e1532-f00f-407b-ad00-c27077225592",
+      "name": "Levoit Core200S Air Purifier Light",
+      "namespace": "NiklasGustafsson",
+      "location": "https://raw.githubusercontent.com/NiklasGustafsson/Hubitat/master/Drivers/Levoit/LevoitCore200S%20Light.groovy",
+      "required": false
+    },
+    {
+      "id": "4467437a-8850-4a9e-9722-cbf98c984952",
+      "name": "Levoit Core200S Air Purifier",
+      "namespace": "NiklasGustafsson",
+      "location": "https://raw.githubusercontent.com/NiklasGustafsson/Hubitat/master/Drivers/Levoit/LevoitCore200S.groovy",
+      "required": false
+    },
+    {
+      "id": "9044814e-27d1-498d-a0a8-308f49002467",
+      "name": "Levoit Core300S Air Purifier",
+      "namespace": "NiklasGustafsson",
+      "location": "https://raw.githubusercontent.com/NiklasGustafsson/Hubitat/master/Drivers/Levoit/LevoitCore300S.groovy",
+      "required": false
+    },
+    {
+      "id": "a9c8ab02-abd9-4956-b000-68331d59f1df",
+      "name": "Levoit Core400S Air Purifier",
+      "namespace": "NiklasGustafsson",
+      "location": "https://raw.githubusercontent.com/NiklasGustafsson/Hubitat/master/Drivers/Levoit/LevoitCore400S.groovy",
+      "required": false
+    },
+    {
+      "id": "b7d0cbb9-3419-4c5c-8926-a90519ce929f",
+      "name": "Levoit Core600S Air Purifier",
+      "namespace": "NiklasGustafsson",
+      "location": "https://raw.githubusercontent.com/NiklasGustafsson/Hubitat/master/Drivers/Levoit/LevoitCore600S.groovy",
+      "required": false
+    },
+    {
+      "id": "65bbed4f-4075-46ad-a2fc-c148e1af21e4",
+      "name": "VeSync Integration",
+      "namespace": "NiklasGustafsson",
+      "location": "https://raw.githubusercontent.com/NiklasGustafsson/Hubitat/master/Drivers/Levoit/VeSyncIntegration.groovy",
+      "required": true
+    }
+  ]
+}
