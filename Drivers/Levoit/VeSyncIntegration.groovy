@@ -171,7 +171,30 @@ def Boolean updateDevices()
 
     runIn((int)settings.refreshInterval, updateDevices)
 }
+private deviceType(code) {
+    switch(code)
+    {
+        case "Core200S": 
+        case "LAP-C201S-AUSR":
+        case "LAP-C201S-WUSR":
+            return "200S";
+        case "Core300S": 
+        case "LAP-C301S-WJP":
+            return "300S";
+        case "Core400S": 
+        case "LAP-C401S-WJP":
+        case "LAP-C401S-WUSR":
+        case "LAP-C401S-WAAA":
+            return "400S";
+        case "Core600S": 
+        case "LAP-C601S-WUS":
+        case "LAP-C601S-WUSR":
+        case "LAP-C601S-WEU":
+            return "600S";
+    }
 
+    return "N/A";
+}
 private Boolean getDevices() {
 
 	def params = [
@@ -213,12 +236,14 @@ private Boolean getDevices() {
 				for (device in resp.data.result.list) {
                     logDebug "Device found: ${device.deviceType} / ${device.deviceName} / ${device.macID}"
 
-                    if (device.deviceType == "Core200S" || device.deviceType == "LAP-C201S-AUSR")
+                    def dtype = deviceType(device.deviceType);
+
+                    if (dtype == "200S")
                     {
                         newList[device.cid] = device.configModule;
                         newList[device.cid+"-nl"] = device.configModule;
                     }
-                    else if (device.deviceType == "Core400S" || device.deviceType == "Core300S" || device.deviceType == "LAP-C601S-WUS") {
+                    else if (dtype == "400S" || dtype == "300S" || dtype == "600S") {
                         newList[device.cid] = device.configModule;
                     }
                 }
@@ -236,11 +261,13 @@ private Boolean getDevices() {
 
 				for (device in resp.data.result.list) {
                     
+                    def dtype = deviceType(device.deviceType);
+
                     com.hubitat.app.ChildDeviceWrapper equip1 = getChildDevice(device.cid)
 
-                    if (device.deviceType == "Core200S" || device.deviceType == "LAP-C201S-AUSR")
+                    if (dtype == "200S")
                     {
-                        def update = null
+                        def update = null;
 
                         com.hubitat.app.ChildDeviceWrapper equip2 = getChildDevice(device.cid+"-nl")
 
@@ -251,6 +278,12 @@ private Boolean getDevices() {
                             equip2.updateDataValue("cid", device.cid);
                             equip2.updateDataValue("uuid", device.uuid);
                         }
+                        else {
+                            // In case the device name has changed.
+                            logDebug "Updating ${device.deviceName} Light / " + dtype;
+                            equip2.name = device.deviceName + " Light";
+                            equip2.label = device.deviceName + " Light";
+                        }                        
 
                         if (equip1 == null)
                         {
@@ -262,11 +295,12 @@ private Boolean getDevices() {
                         }
                         else {
                             // In case the device name has changed.
+                            logDebug "Updating ${device.deviceName} / " + dtype;
                             equip1.name = device.deviceName;
                             equip1.label = device.deviceName;
                         }                        
                     }
-                    else if (device.deviceType == "Core300S")
+                    else if (dtype == "300S")
                     {
                         if (equip1 == null)
                         {
@@ -278,11 +312,12 @@ private Boolean getDevices() {
                         }
                         else {
                             // In case the device name has changed.
+                            logDebug "Updating ${device.deviceName} / " + dtype;
                             equip1.name = device.deviceName;
                             equip1.label = device.deviceName;
                         }                        
                     }
-                    else if (device.deviceType == "Core400S")
+                    else if (dtype == "400S")
                     {
                         if (equip1 == null)
                         {
@@ -294,11 +329,12 @@ private Boolean getDevices() {
                         }
                         else {
                             // In case the device name has changed.
+                            logDebug "Updating ${device.deviceName} / " + dtype;
                             equip1.name = device.deviceName;
                             equip1.label = device.deviceName;
                         }                        
                     }
-                    else if (device.deviceType == "LAP-C601S-WUS")
+                    else if (dtype == "600S")
                     {
                         if (equip1 == null)
                         {
@@ -310,6 +346,7 @@ private Boolean getDevices() {
                         }
                         else {
                             // In case the device name has changed.
+                            logDebug "Updating ${device.deviceName} / " + dtype;
                             equip1.name = device.deviceName;
                             equip1.label = device.deviceName;
                         }                        
