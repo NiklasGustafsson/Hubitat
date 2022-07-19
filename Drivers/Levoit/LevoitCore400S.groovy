@@ -25,6 +25,7 @@ SOFTWARE.
 
 // History:
 // 
+// 2022-07-19: v1.2 Support for setting the auto-mode of the purifier.
 // 2022-07-18: v1.1 Support for Levoit Air Purifier Core 600S.
 //                  Split into separate files for each device.
 //                  Support for 'SwitchLevel' capability.
@@ -60,7 +61,11 @@ metadata {
             command "setDisplay", [[name:"Display*", type: "ENUM", description: "Display", constraints: ["on", "off"] ] ]
             command "setSpeed", [[name:"Speed*", type: "ENUM", description: "Speed", constraints: ["off", "sleep", "auto", "low", "medium", "high", "max"] ] ]
             command "setMode",  [[name:"Mode*", type: "ENUM", description: "Mode", constraints: ["manual", "sleep", "auto"] ] ]
+            command "setAutoMode",  [
+                [name:"Mode*", type: "ENUM", description: "Mode", constraints: ["default", "quiet", "efficient"] ],  
+                [ name:"Room Size", type: "NUMBER", description: "Room size in square feet" ] ]
             command "toggle"
+            command "update"
         }
 
     preferences {
@@ -218,6 +223,31 @@ def setMode(mode) {
     }
 }
 
+def setAutoMode(mode) {
+    setAutoMode(mode, 100);
+}
+
+def setAutoMode(mode, roomSize) {
+    logDebug "setAutoMode(${mode}, ${roomSize})"
+    
+    if (mode == "efficient") {
+        handleAutoMode(mode, roomSize);
+    	handleEvent("room_size", roomSize)
+    }
+    else {
+        handleAutoMode(mode);
+    }
+
+    handleMode("auto");
+    state.mode = "auto";
+    state.auto_mode = mode;
+    state.room_size = roomSize;
+
+	handleEvent("auto_mode", mode)
+	handleEvent("mode", "auto")
+    handleEvent("speed",  "auto")    
+}
+
 def setDisplay(displayOn) {
     logDebug "setDisplay(${displayOn})"
     handleDisplayOn(displayOn)
@@ -337,6 +367,42 @@ def handleMode(mode) {
     return result
 }
 
+def handleAutoMode(mode) {
+
+    def result = false
+
+    parent.sendBypassRequest(device, [
+                data: [ "type": mode ],
+                "method": "setAutoPreference",
+                "source": "APP"
+            ]) { resp ->
+			if (checkHttpResponse("handleMode", resp))
+			{
+                logDebug "Set mode"
+				result = true
+			}
+		}
+    return result
+}
+
+def handleAutoMode(mode, size) {
+
+    def result = false
+
+    parent.sendBypassRequest(device, [
+                data: [ "type": mode, "room_size": size ],
+                "method": "setAutoPreference",
+                "source": "APP"
+            ]) { resp ->
+			if (checkHttpResponse("handleMode", resp))
+			{
+                logDebug "Set mode"
+				result = true
+			}
+		}
+    return result
+}
+
 def update() {
 
     logDebug "update()"
@@ -364,9 +430,13 @@ def update(status, nightLight)
 
     state.speed = mapIntegerToSpeed(status.result.level)
     state.mode = status.result.mode
+    state.auto_mode = status.result.configuration.auto_preference.type
+    state.room_size = status.result.configuration.auto_preference.room_size
 
     handleEvent("switch", status.result.enabled ? "on" : "off")
     handleEvent("mode",   status.result.mode)
+    handleEvent("auto_mode", status.result.configuration.auto_preference.type)
+    handleEvent("room_size", status.result.configuration.auto_preference.room_size)
     handleEvent("filter", status.result.filter_life)
 
     switch(state.mode)
