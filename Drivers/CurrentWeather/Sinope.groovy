@@ -7,9 +7,10 @@
  * My edits extend to adding support for setting the outdoor temperature via 'setLevel()'. This is used with my 'Sinopé Outdoor Temperature' app,
  * which averages the temperature of a number of sensors and sets the outdoor temperature of a Sinopé thermostat.
  *
- * Version: 0.1
+ * Version: 0.3
  * 0.1     (2020-08-28) => First version, based on v0.3 of scoulombe79's driver
  * 0.2     (2020-12-07) => Added support for dsiplay pn / off
+ * 0.3     (2022-07-28) => Suppress multiple events with the same value.
  *
  * Author: NiklasGustafsson (based on scoulombe79's code)
  *
@@ -77,6 +78,9 @@ def installed()
 {
     if (settings.trace)
         log.trace "TH1123ZB >> installed()"
+
+    state.heatingDemand = -150
+    state.temperature = -150.0
 
     initialize()
 }
@@ -177,18 +181,38 @@ def createCustomMap(descMap)
 
     if (descMap.cluster == "0201" && descMap.attrId == "0000")
     {
-        map.name = "temperature"
-        map.value = getTemperatureValue(descMap.value)
-        sendEvent(name: map.name, value: map.value, unit: scale)
+        def name = "temperature"
+        def value = getTemperatureValue(descMap.value)
+
+        if (state.temperature != value) {
+            map.name = name
+            map.value = value
+            sendEvent(name: map.name, value: map.value, unit: scale)
+        }
+
+        state.temperature = value
+
         sendEvent(name: "checkInterval", value: 30*60, displayed: false, data: [protocol: "zigbee", hubHardwareId: device.hub.hardwareID])
     }
     else if (descMap.cluster == "0201" && descMap.attrId == "0008")
     {
-        map.name = "heatingDemand"
-        map.value = getHeatingDemand(descMap.value)
-        sendEvent(name: map.name, value: map.value)
-        def operatingState = (map.value.toInteger() < 10) ? "idle" : "heating"
-        sendEvent(name: "thermostatOperatingState", value: operatingState)
+        def name = "heatingDemand"
+        def value = getHeatingDemand(descMap.value)
+
+        def intValue = value.toInteger()
+
+        if (state.heatingDemand != intValue) {
+
+            map.name = name
+            map.value = value
+
+            sendEvent(name: map.name, value: map.value)
+            def operatingState = (intValue < 10) ? "idle" : "heating"
+            sendEvent(name: "thermostatOperatingState", value: operatingState)
+        }
+
+        state.heatingDemand = intValue
+
     }
     else if (descMap.cluster == "0B04" && descMap.attrId == "050B")
     {
