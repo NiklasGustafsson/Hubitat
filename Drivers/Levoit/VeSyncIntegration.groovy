@@ -25,6 +25,7 @@ SOFTWARE.
 
 // History:
 // 
+// 2022-08-05: v1.3 Fixed error caused by change in VeSync API for getPurifierStatus.
 // 2022-07-18: v1.1 Support for Levoit Air Purifier Core 600S.
 //                  Split into separate files for each device.
 //                  Support for 'SwitchLevel' capability.
@@ -145,6 +146,12 @@ private Boolean login()
 
 def Boolean updateDevices()
 {
+    def command = [
+            "method": "getPurifierStatus",
+            "source": "APP",
+            "data": [:]
+        ]
+
     for (e in state.deviceList) {
 
         def dni = e.key
@@ -156,15 +163,14 @@ def Boolean updateDevices()
 
         def dev = getChildDevice(dni)
 
-        sendBypassRequest(dev,  [
-            "method": "getPurifierStatus",
-            "source": "APP"
-        ]) { resp ->
+        sendBypassRequest(dev, command) { resp ->
             if (checkHttpResponse("update", resp))
             {
                 def status = resp.data.result
-
-                result = dev.update(status, getChildDevice(dni+"-nl"))
+                if (status == null)
+                    logError "No status returned from getPurifierStatus: ${resp.msg}"
+                else
+                    result = dev.update(status, getChildDevice(dni+"-nl"))
             }
         }
     }

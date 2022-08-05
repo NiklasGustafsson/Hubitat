@@ -25,6 +25,7 @@ SOFTWARE.
 
 // History:
 // 
+// 2022-08-05: v1.3 Fixed error caused by change in VeSync API for getPurifierStatus.
 // 2022-07-19: v1.2 Support for setting the auto-mode of the purifier.
 // 2022-07-18: v1.1 Support for Levoit Air Purifier Core 600S.
 //                  Split into separate files for each device.
@@ -400,12 +401,16 @@ def update() {
 
     parent.sendBypassRequest(device,  [
                 "method": "getPurifierStatus",
-                "source": "APP"
+                "source": "APP",
+                "data": [:]
             ]) { resp ->
 			if (checkHttpResponse("update", resp))
 			{
                 def status = resp.data.result
-                result = update(status, null)                
+                if (status == null)
+                    logError "No status returned from getPurifierStatus: ${resp.msg}"
+                else
+                    result = update(status, null)                
 			}
 		}
     return result
