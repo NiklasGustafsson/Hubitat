@@ -47,7 +47,7 @@ metadata {
         documentationLink: "https://github.com/dcmeglio/hubitat-bond/blob/master/README.md")
         {
             capability "Actuator"
-            attribute "hearbeat", "bool";  
+            attribute "heartbeat", "bool";  
         }
 
     preferences {
@@ -155,6 +155,10 @@ def Boolean updateDevices()
             "data": [:]
         ]
 
+    sendEvent(name: "heartbeat", value: false)
+
+    runIn((int)settings.refreshInterval, updateDevices)
+
     for (e in state.deviceList) {
 
         try {
@@ -181,14 +185,12 @@ def Boolean updateDevices()
         catch (exc)
         {
             logError exc.toString();
-            return false
         }
     }
 
     sendEvent(name: "heartbeat", value: true)
-
-    runIn((int)settings.refreshInterval, updateDevices)
 }
+
 private deviceType(code) {
     switch(code)
     {
