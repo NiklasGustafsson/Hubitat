@@ -25,6 +25,13 @@ SOFTWARE.
 
 // History:
 // 
+// 2023-02-04: v1.5 Adding heartbeat event
+// 2023-02-03: v1.4 Logging errors properly.
+// 2022-08-05: v1.3 Fixed error caused by change in VeSync API for getPurifierStatus.
+// 2022-07-19: v1.2 Support for setting the auto-mode of the purifier.
+// 2022-07-18: v1.1 Support for Levoit Air Purifier Core 600S.
+//                  Split into separate files for each device.
+//                  Support for 'SwitchLevel' capability.
 // 2021-10-22: v1.0 Support for Levoit Air Purifier Core 200S / 400S
 
 

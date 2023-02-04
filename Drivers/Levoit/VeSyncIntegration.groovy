@@ -25,6 +25,7 @@ SOFTWARE.
 
 // History:
 // 
+// 2023-02-04: v1.5 Adding heartbeat event
 // 2023-02-03: v1.4 Logging errors properly.
 // 2022-08-05: v1.3 Fixed error caused by change in VeSync API for getPurifierStatus.
 // 2022-07-18: v1.1 Support for Levoit Air Purifier Core 600S.
@@ -47,7 +48,7 @@ metadata {
         documentationLink: "https://github.com/dcmeglio/hubitat-bond/blob/master/README.md")
         {
             capability "Actuator"
-            attribute "heartbeat", "bool";  
+            attribute "heartbeat", "string";  
         }
 
     preferences {
@@ -155,7 +156,7 @@ def Boolean updateDevices()
             "data": [:]
         ]
 
-    sendEvent(name: "heartbeat", value: false)
+    sendEvent(name: "heartbeat", value: "updating")
 
     runIn((int)settings.refreshInterval, updateDevices)
 
@@ -188,7 +189,7 @@ def Boolean updateDevices()
         }
     }
 
-    sendEvent(name: "heartbeat", value: true)
+    sendEvent(name: "heartbeat", value: "updated")
 }
 
 private deviceType(code) {
