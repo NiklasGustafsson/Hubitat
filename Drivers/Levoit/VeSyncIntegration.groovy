@@ -25,6 +25,7 @@ SOFTWARE.
 
 // History:
 // 
+// 2023-02-03: v1.4 Logging errors properly.
 // 2022-08-05: v1.3 Fixed error caused by change in VeSync API for getPurifierStatus.
 // 2022-07-18: v1.1 Support for Levoit Air Purifier Core 600S.
 //                  Split into separate files for each device.
@@ -61,6 +62,7 @@ metadata {
 
 def installed() {
 	logDebug "Installed with settings: ${settings}"
+    updated()
 }
 
 def updated() { 
@@ -119,7 +121,7 @@ private Boolean login()
             "accept-language": "en",
             "appVersion": "2.5.1",
             "tz": "America/Los_Angeles"
- ]
+        ]
 	]
 
     logDebug "login: ${params.uri}"
@@ -138,7 +140,7 @@ private Boolean login()
 	}
 	catch (e)
 	{
-        logDebug e.toString();
+        logError e.toString();
 		checkHttpResponse("login", e.getResponse())
 		return false
 	}
@@ -154,24 +156,31 @@ def Boolean updateDevices()
 
     for (e in state.deviceList) {
 
-        def dni = e.key
-        def configModule = e.value
+        try {
+            def dni = e.key
+            def configModule = e.value
 
-        if (dni.endsWith("-nl")) continue;
-        
-        logDebug "Updating ${dni}"
+            if (dni.endsWith("-nl")) continue;
+            
+            logDebug "Updating ${dni}"
 
-        def dev = getChildDevice(dni)
+            def dev = getChildDevice(dni)
 
-        sendBypassRequest(dev, command) { resp ->
-            if (checkHttpResponse("update", resp))
-            {
-                def status = resp.data.result
-                if (status == null)
-                    logError "No status returned from getPurifierStatus: ${resp.msg}"
-                else
-                    result = dev.update(status, getChildDevice(dni+"-nl"))
+            sendBypassRequest(dev, command) { resp ->
+                if (checkHttpResponse("update", resp))
+                {
+                    def status = resp.data.result
+                    if (status == null)
+                        logError "No status returned from getPurifierStatus: ${resp.msg}"
+                    else
+                        result = dev.update(status, getChildDevice(dni+"-nl"))
+                }
             }
+        }
+        catch (exc)
+        {
+            logError exc.toString();
+            return false
         }
     }
 
