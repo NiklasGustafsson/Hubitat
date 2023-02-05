@@ -25,6 +25,7 @@ SOFTWARE.
 
 // History:
 // 
+// 2023-02-05: v1.6 Fixed the heartbeat logic.
 // 2023-02-04: v1.5 Adding heartbeat event
 // 2023-02-03: v1.4 Logging errors properly.
 // 2022-08-05: v1.3 Fixed error caused by change in VeSync API for getPurifierStatus.
