@@ -424,20 +424,21 @@ def update(status, nightLight)
 
     logDebug status
 
-    state.speed = mapIntegerToSpeed(status.result.level)
-    state.mode = status.result.mode
-    state.auto_mode = status.result.configuration.auto_preference.type
-    state.room_size = status.result.configuration.auto_preference.room_size
+    def speed = mapIntegerToSpeed(status.result.level)
+    def mode = status.result.mode
+    def auto_mode = status.result.configuration.auto_preference.type
+    def room_size = status.result.configuration.auto_preference.room_size
 
     handleEvent("switch", status.result.enabled ? "on" : "off")
-    handleEvent("mode",   status.result.mode)
-    handleEvent("auto_mode", status.result.configuration.auto_preference.type)
-    handleEvent("filter", status.result.filter_life)
+    if (state.mode == null || mode != state.mode) 
+        handleEvent("mode",   status.result.mode)
+    if (state.auto_mode == null || auto_mode != state.auto_mode) 
+        handleEvent("auto_mode", status.result.configuration.auto_preference.type)
 
     switch(state.mode)
     {
         case "manual":
-            handleEvent("speed",  mapIntegerToSpeed(status.result.level))
+            handleEvent("speed",  speed)
             break;
         case "auto":
             handleEvent("speed",  "auto")
@@ -446,6 +447,11 @@ def update(status, nightLight)
             handleEvent("speed",  "on")
             break;
     }
+
+    state.speed = speed
+    state.mode = status.result.mode
+    state.auto_mode = auto_mode
+    state.room_size = room_size
 
     updateAQIandFilter(status.result.air_quality_value.toString(),status.result.filter_life)
 }
