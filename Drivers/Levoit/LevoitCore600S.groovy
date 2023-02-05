@@ -235,7 +235,6 @@ def setAutoMode(mode, roomSize) {
     
     if (mode == "efficient") {
         handleAutoMode(mode, roomSize);
-    	handleEvent("room_size", roomSize)
     }
     else {
         handleAutoMode(mode);
@@ -443,7 +442,6 @@ def update(status, nightLight)
     handleEvent("switch", status.result.enabled ? "on" : "off")
     handleEvent("mode",   status.result.mode)
     handleEvent("auto_mode", status.result.configuration.auto_preference.type)
-    handleEvent("room_size", status.result.configuration.auto_preference.room_size)
     handleEvent("filter", status.result.filter_life)
 
     switch(state.mode)

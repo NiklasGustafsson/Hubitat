@@ -1,9 +1,12 @@
 {
   "packageName": "Levoit Air Purifiers",
   "author": "Niklas Gustafsson",
-  "version": "1.5",
+  "version": "1.6",
   "minimumHEVersion": "2.3.2",
-  "dateReleased": "2022-02-03",
+  "dateReleased": "2022-02-05",
+  "releaseNotes": "Added proper heartbeat logic for the synchronization with VeSync servers.\nRemove reporting of room size.",
+  "documentationLink": "https://github.com/NiklasGustafsson/Hubitat/blob/master/Drivers/Levoit/readme.md",
+  "licenseFile": "https://raw.githubusercontent.com/NiklasGustafsson/Hubitat/master/LICENSE",
   "drivers": [
     {
       "id": "e55e1532-f00f-407b-ad00-c27077225592",

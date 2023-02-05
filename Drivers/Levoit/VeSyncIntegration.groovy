@@ -69,9 +69,10 @@ def installed() {
 
 def updated() { 
 	logDebug "Updated with settings: ${settings}"
-    // state.clear()
-    unschedule()
+
 	initialize()
+
+    runIn(5 * (int)settings.refreshInterval, timeOutLevoit)
 
     updateDevices()
 
@@ -80,6 +81,9 @@ def updated() {
 }
 
 def uninstalled() {
+    
+    unschedule()
+
 	logDebug "Uninstalled app"
 
 	for (device in getChildDevices())
@@ -150,15 +154,17 @@ private Boolean login()
 
 def Boolean updateDevices()
 {
+    // Immediately schedule the next update -- this will keep the 
+    // referesh interval as close to constant as possible.
+    runIn((int)settings.refreshInterval, updateDevices)
+
     def command = [
             "method": "getPurifierStatus",
             "source": "APP",
             "data": [:]
         ]
 
-    sendEvent(name: "heartbeat", value: "updating")
-
-    runIn((int)settings.refreshInterval, updateDevices)
+    sendEvent(name: "heartbeat", value: "syncing", isStateChange: true, descriptionText: "Waiting on update from VeSync servers.")
 
     for (e in state.deviceList) {
 
@@ -189,7 +195,11 @@ def Boolean updateDevices()
         }
     }
 
-    sendEvent(name: "heartbeat", value: "updated")
+    sendEvent(name: "heartbeat", value: "synced", isStateChange: true, descriptionText: "Update received from VeSync servers.")
+
+    // Schedule a call to the timeout method. This will cancel any outstanding
+    // schedules.
+    runIn(5 * (int)settings.refreshInterval, timeOutLevoit)
 }
 
 private deviceType(code) {
@@ -376,6 +386,8 @@ private Boolean getDevices() {
 
                 state.deviceList = newList
 
+                runIn(5 * (int)settings.refreshInterval, timeOutLevoit)
+                
                 updateDevices()
 
 				result = true
@@ -508,4 +520,9 @@ def checkHttpResponse(action, resp) {
 		log.error "${action}: unexpected HTTP response: ${resp.status}"
 		return false
 	}
+}
+
+def timeOutLevoit() {
+    //If the timeout expires before being reset, mark this Parent Device as 'not present' to allow action to be taken
+    sendEvent(name: "heartbeat", value: "not synced", isStateChange: true, descriptionText: "No update received from VeSync servers in a long time.")
 }
