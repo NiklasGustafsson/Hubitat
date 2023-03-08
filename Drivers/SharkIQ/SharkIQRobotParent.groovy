@@ -290,8 +290,8 @@ def cleanSpecificRoom(String room) {
 
     def found = false
         
-    childDevices.each { child ->
-        if (child.name == room) {
+    state.room_list[1..-1].each { r ->
+        if (r == room) {
             found = true
         }
     }
