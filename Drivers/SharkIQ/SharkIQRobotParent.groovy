@@ -33,7 +33,8 @@ metadata {
         command "locate"
         command "pause"
         command "createRoomDevices"
-        command "deleteMissingRooms"
+        command "removeRoomDevices"
+        command "cleanSpecificRoom", ["string"]
         command "setPowerMode", [[name:"Set Power Mode to", type: "ENUM",description: "Set Power Mode", constraints: ["Eco", "Normal", "Max"]]]
         command "getRobotInfo", [[name:"Get verbose robot information and push to logs."]]
 
@@ -154,6 +155,8 @@ def createRoomDevices() {
 
     updateAvailableRooms()
 
+    deleteMissingRooms()
+
     if (state.room_list != null && state.room_list.size() >= 2) {
         // Add new rooms to the list of rooms to clean
         
@@ -176,13 +179,23 @@ def createRoomDevices() {
             if (childDevice == null)
             {
                 createChildDevice(room, cleanName)
+                logging("i", "Created device: ${device.id}-${cleanName}")
             }
         }
     }
 
 }
 
-def deleteMissingRooms() {
+def removeRoomDevices() {
+
+    childDevices.each { child ->
+    
+        logging("i", "Removing device: ${child.deviceNetworkId}")
+        deleteChildDevice(child.deviceNetworkId)  
+    }      
+}
+
+private void deleteMissingRooms() {
     // Remove devices representing rooms that are no longer available
     
     childDevices.each { child ->
@@ -206,7 +219,7 @@ def deleteMissingRooms() {
         
         if (!found)
         {
-            logging("w", "Removing device: ${child.deviceNetworkId}")
+            logging("i", "Removing device: ${child.deviceNetworkId}")
             deleteChildDevice(child.deviceNetworkId)
         }
     }
