@@ -30,11 +30,13 @@ metadata {
         capability "Refresh"
         capability "Momentary"
         capability "Battery"
+        capability "Actuator"
+        
         command "locate"
         command "pause"
         command "createRoomDevices"
-        command "removeRoomDevices"
-        command "cleanSpecificRoom", ["string"]
+        // command "removeRoomDevices"
+        command "cleanSpecificRooms", ["string"]
         command "setPowerMode", [[name:"Set Power Mode to", type: "ENUM",description: "Set Power Mode", constraints: ["Eco", "Normal", "Max"]]]
         command "getRobotInfo", [[name:"Get verbose robot information and push to logs."]]
 
@@ -155,7 +157,7 @@ def createRoomDevices() {
 
     updateAvailableRooms()
 
-    deleteMissingRooms()
+    //deleteMissingRooms()
 
     if (state.room_list != null && state.room_list.size() >= 2) {
         // Add new rooms to the list of rooms to clean
@@ -277,22 +279,44 @@ def locate() {
     runIn(10, refresh)
 }
 
-private byte[] encodeString(String str) {
+private byte[] encodeString(rooms) 
+{
+    def str = rooms.join("\n")
+    logging("d", "encoding: " + str)
 
+    def roomsNo = rooms.size()
 
     def bytes = str.getBytes()
     def bLen = bytes.length
-    def encoded = new byte[bLen+1];
+    // The length of all names + byte to hold length + '\n' separator
+    def encoded = new byte[bLen+roomsNo];
 
-    encoded[0] = (byte)bLen;
-    for (int i = 0; i < bLen; i++) {
-        encoded[i+1] = bytes[i];
-    }
+    def offset = 0;
 
+    def first = true
+
+    rooms.each { room ->
+
+        bytes = room.getBytes()
+        bLen = bytes.length    
+        if (!first) {
+            encoded[offset] = (byte)0xa;
+            offset += 1
+        }
+        encoded[offset] = (byte)bLen;
+        offset += 1
+        for (int i = 0; i < bLen; i++) {
+            encoded[offset+i] = bytes[i];
+        }
+        offset += bLen;
+        first = false
+    }    
+
+    logging("d", "encoded " + encoded.toString())
     return encoded
 }
 
-def cleanSpecificRoom(String room) {
+def cleanSpecificRooms(String input_list) {
 
     if (state.room_list.size() == 0)
     {
@@ -301,33 +325,61 @@ def cleanSpecificRoom(String room) {
         return
     }
 
-    def found = false
-        
-    state.room_list[1..-1].each { r ->
-        if (r == room) {
-            found = true
-        }
-    }
-
-    if (!found)
+    if (input_list == null || input_list.size() == 0)
     {
-        logging("e", "There is no room called '${room}' in the Shark map.")
+        logging("i", "No rooms to clean: '${room}'")
         return
     }
 
-    logging("i", "Cleaning: " + room)
+    logging("d", "cleanSpecificRooms('${input_list}')")
+
+    def rooms = input_list.split(",")
+
+    for (i = 0; i < rooms.size(); i++)
+    {
+        rooms[i] = rooms[i].trim()
+    }
+
+    def roomCount = 0
+
+    rooms.each { room -> 
+
+        def found = false
     
+        state.room_list[1..-1].each { r ->
+            if (r == room) {
+                found = true
+                roomCount += 1
+            }
+        }
+
+        if (!found)
+        {
+            logging("w", "There is no room called '${room}' in the Shark map.")
+            return
+        }
+
+        logging("i", "Cleaning: '${room}'")
+    }
+
+    if (roomCount == 0) {
+        logging("d", "No rooms to clean")
+        return
+    }
+
     identifier = state.room_list[0];
+    logging("d", "identifier: " + identifier.toString())
+
     header = [0x80, 0x1, 0xb, 0xca, 0x2] as byte[]; // Static on all calls
 
-    byte[] rooms_enc = encodeString(room)  
-    byte[] footer = [[(byte)0x1a], encodeString(identifier)].flatten() as byte[]
+    byte[] rooms_enc = encodeString(rooms)  
+    byte[] footer = [[(byte)0x1a], encodeString([identifier])].flatten() as byte[]
 
     header = [header, [(byte)(1 + rooms_enc.length + footer.length)], [(byte)0xa]].flatten() as byte[]
 
-    logging("d", header.toString())
-    logging("d", rooms_enc.toString())
-    logging("d", footer.toString())
+    logging("d", "header: " + header.toString())
+    logging("d", "rooms_enc: " + rooms_enc.toString())
+    logging("d", "footer: " + footer.toString())
 
     all = [header, rooms_enc, footer].flatten() as byte[]
     def encoded = all.encodeAsBase64().toString();
@@ -341,20 +393,8 @@ def cleanSpecificRoom(String room) {
     runIn(10, refresh)
 }
 
-def cleanRoomGroup1(){
-    cleanSpecificRoom(roomCleanGroupOne)
-}
-
-def cleanRoomGroup2(){
-    cleanSpecificRoom(roomCleanGroupTwo)
-}
-
-def cleanRoomGroup3(){
-    cleanSpecificRoom(roomCleanGroupThree)
-}
-
 def getRobotInfo(){
-    propertiesResults = runGetPropertiesCmd("names[]=GET_Main_PCB_BL_Version&names[]=GET_Main_PCB_HW_Version&names[]=GET_Main_PCB_FW_Version&names[]=GET_Nav_Module_FW_Version&names[]=GET_Nav_Module_App_Version&names[]=GET_SCM_FW_Version&names[]=GET_Robot_Room_List")
+    propertiesResults = runGetPropertiesCmd("names[]=GET_Main_PCB_BL_Version&names[]=GET_Main_PCB_HW_Version&names[]=GET_Main_PCB_FW_Version&names[]=GET_Nav_Module_FW_Version&names[]=GET_Nav_Module_App_Version&names[]=GET_SCM_FW_Version&names[]=GET_Robot_Room_List&names[]=GET_Areas_To_Clean")
     propertiesResults.each { singleProperty ->
         if (singleProperty.property.name == "GET_Main_PCB_BL_Version")
         {
@@ -384,6 +424,10 @@ def getRobotInfo(){
         {
             logging("i", "Robot_Room_List: $singleProperty.property.value")
         }
+        else if (singleProperty.property.name == "GET_Areas_To_Clean")
+        {
+            logging("i", "Areas_To_Clean: $singleProperty.property.value")
+        }
     }
 }
 
@@ -392,7 +436,7 @@ def getRobotInfo(){
  }
 
 def grabSharkInfo() {
-    propertiesResults = runGetPropertiesCmd("names[]=GET_Battery_Capacity&names[]=GET_Recharging_To_Resume&names[]=GET_Charging_Status&names[]=GET_Operating_Mode&names[]=GET_Power_Mode&names[]=GET_RSSI&names[]=GET_Error_Code&names[]=GET_Robot_Volume_Setting&names[]=OTA_FW_VERSION&names[]=GET_Robot_Room_List")
+    propertiesResults = runGetPropertiesCmd("names[]=GET_Battery_Capacity&names[]=GET_Recharging_To_Resume&names[]=GET_Charging_Status&names[]=GET_Operating_Mode&names[]=GET_Power_Mode&names[]=GET_RSSI&names[]=GET_Error_Code&names[]=GET_Robot_Volume_Setting&names[]=OTA_FW_VERSION&names[]=GET_Robot_Room_List&names[]=GET_Areas_To_Clean")
     propertiesResults.each { singleProperty ->
 
         if (singleProperty.property.name == "GET_Battery_Capacity")
@@ -445,6 +489,11 @@ def grabSharkInfo() {
                 state.room_list = []
             }
         }
+        else if (singleProperty.property.name == "GET_Areas_To_Clean")
+        {
+            state.areas = singleProperty.property.value
+        }
+
     }
 
     // Charging Status

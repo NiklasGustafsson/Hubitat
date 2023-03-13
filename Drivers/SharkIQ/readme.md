@@ -10,6 +10,24 @@ This integration was created by manipulating API requests that were captured thr
 
 Please send feedback and/or issues to the Hubitat Forum Thread: https://community.hubitat.com/t/shark-iq-robot/34286, or issues to the Issues Section of this Repository.
 
+## Rooms
+
+The driver now supports cleaning specific rooms. You can either use the 'Clean Specific Rooms' command and pass a comma-separated list of rooms to it. The rooms must be spelled exactly like in the app, or by creating a device for each room using the 'Create Room Devices'.
+
+Rooms simplify integration into automation rules, but there are some complications. Some robots have a tendency to lose their maps, in which case the room list is no longer valid. Orphaned devices will not disappear from HE, and trying to run automations will fail, but nicely (the parent will just say there's no such room).
+
+### Clean Specific Rooms
+
+This is the simpler method -- pass a comma-separated list of room names, spelled just like in the app, to the command. The driver is now also an Actuator, which means that the 'cleanSpecicicRooms' command can be used in Rule Machine actions.
+
+### Room Devices
+
+Using room devices can be useful for integration into dashboards, offering the capability to have a tile to control vacuuming each room. In order to use rooms, you need to also install the SharkIQRobotChild.groovy driver file.
+
+In order to create a device for each room on the map, use the 'Create Room Devices' command on the device settings page. This will create a child device for each room. The child device acts as a switch -- on starts it, off sends it back to the dock. It relies on the 'Clean Specific Rooms' command in the parent device to do all the work.
+
+
+
 ## Preferences:
 
 | Preference | Description |
@@ -24,7 +42,6 @@ Please send feedback and/or issues to the Hubitat Forum Thread: https://communit
 | Scheduled Run Time from Shark App | Enter the time Shark is scheduled to run through the Shark App to control dormant smart scheduling, blank to disable and default to 15 minute pings when dormant |
 | Google Home Compatibility | Toggle to add a 'status' state |
 | Enable Debug Logging | Adds more logging information. |
-
 
 <br>
 
