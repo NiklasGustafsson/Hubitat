@@ -12,6 +12,9 @@
 
 */
 
+// NOTE: THIS IS A MODIFIED VERSION OF THE COMMUNITY DRIVER. IT SEPARATES THE ISSUING OF COMMANDS
+//       USING THE CHECK-MARK KEY FROM ARM/DISARM CODES.
+
 import groovy.transform.Field
 import groovy.json.JsonOutput
 
@@ -41,7 +44,8 @@ metadata {
         command "setArmNightDelay", ["number"]
         command "setPartialFunction"
         command "resetKeypad"
-        command "setCommand", [[name: "Code", type: "NUMBER"], [name: "Command", type: "STRING"]] 
+        command "sendCommand", [[name: "Code", type: "NUMBER"]] 
+        command "setCommand", [[name: "Code", type: "NUMBER"], [name: "Command", type: "STRING"], [name: "Description", type: "STRING"]] 
         command "deleteCommand", [[name: "Code", type: "NUMBER"]] 
         command "playTone", [[name: "Play Tone", type: "STRING", description: "Tone_1, Tone_2, etc."]]
         command "volAnnouncement", [[name:"Announcement Volume", type:"NUMBER", description: "Volume level (1-10)"]]
@@ -696,7 +700,7 @@ private Boolean validateCommand(String pincode) {
 
         if (command != null) {
             sendEvent(name:"validCode", value: "true", isStateChange: true)
-            sendEvent(name:"command", value: "${command}", isStateChange:true)
+            sendEvent(name:"command", value: command.group, descriptionText: command.name, isStateChange:true)
             return true
         }
     }
@@ -773,18 +777,33 @@ void setCode(codeposition, pincode, name) {
     //log.debug "Lock codes: ${lockcodes}"
 }
 
-void setCommand(code, name) {
-    if (logEnable) log.debug "setCommand(${code}, ${name})"
+void setCommand(code, command, description) {
+    if (logEnable) log.debug "setCommand(${code}, ${command}, ${description})"
 
     boolean newCode = true
     if (state.commands == null) state.commands = [:]
 
     if (state.commands[code] != null) { newCode = false }
-    state.commands[code] = name
+    state.commands[code] = [ group: command, name: description ]
     if (newCode) {
-        sendEvent(name: "command", value:"added")
+        sendEvent(name: "commandSet", value:"added")
     } else {
-        sendEvent(name: "command", value: "changed")
+        sendEvent(name: "commandSet", value: "changed")
+    }
+}
+
+void setCommand(code, command) {
+    if (logEnable) log.debug "setCommand(${code}, ${command})"
+
+    boolean newCode = true
+    if (state.commands == null) state.commands = [:]
+
+    if (state.commands[code] != null) { newCode = false }
+    state.commands[code] = [ group: command, name: "" ]
+    if (newCode) {
+        sendEvent(name: "commandSet", value:"added")
+    } else {
+        sendEvent(name: "commandSet", value: "changed")
     }
 }
 
@@ -833,6 +852,13 @@ void deleteCommand(code) {
     }
 
     state.commands = newCodes
+}
+
+void sendCommand(code) 
+{
+    if (logEnable) log.debug "sendCommand(${code})"
+
+    validateCommand("${code}")
 }
 
 void zwaveEvent(hubitat.zwave.commands.indicatorv3.IndicatorReport cmd) {
