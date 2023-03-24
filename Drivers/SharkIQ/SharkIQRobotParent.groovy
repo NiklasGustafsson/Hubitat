@@ -316,18 +316,34 @@ private byte[] encodeString(rooms)
     return encoded
 }
 
-def cleanSpecificRooms(String input_list) {
-
-    if (state.room_list.size() == 0)
+def cleanSpecificRooms(String input_list) 
+{
+    // Special meaning: clean all rooms
+    if (input_list == "All") 
     {
-        logging("e", "There are no rooms in the Shark map.")
-        runIn(10, refresh)
+        logging("i", "Cleaning all rooms.")
+        on()
+        return
+    }
+
+    // Special meaning: go back to the dock if not already there
+    if (input_list == "Dock") 
+    {
+        logging("i", "Return to dock.")
+        off()
         return
     }
 
     if (input_list == null || input_list.size() == 0)
     {
-        logging("i", "No rooms to clean: '${room}'")
+        logging("i", "No rooms to clean were specified.")
+        return
+    }
+
+    if (state.room_list.size() == 0)
+    {
+        logging("e", "There are no rooms in the Shark map.")
+        runIn(10, refresh)
         return
     }
 
