@@ -47,6 +47,7 @@ metadata {
         command "sendCommand", [[name: "Code", type: "NUMBER"]] 
         command "setCommand", [[name: "Code", type: "NUMBER"], [name: "Command", type: "STRING"], [name: "Description", type: "STRING"]] 
         command "deleteCommand", [[name: "Code", type: "NUMBER"]] 
+        command "clearAllCommands", ["string"]
         command "playTone", [[name: "Play Tone", type: "STRING", description: "Tone_1, Tone_2, etc."]]
         command "volAnnouncement", [[name:"Announcement Volume", type:"NUMBER", description: "Volume level (1-10)"]]
         command "volKeytone", [[name:"Keytone Volume", type:"NUMBER", description: "Volume level (1-10)"]]
@@ -574,6 +575,9 @@ void parseEntryControl(Short command, List<Short> commandBytes) {
                 sendEvent(name:"lastCodeEpochms", value: "${ems}", isStateChange:true)
                 sendEvent(name: "held", value: 13, isStateChange: true)
                 break
+            case 25:    // Cancel command
+                sendToDevice(zwave.indicatorV3.indicatorSet(indicatorCount:1, value: 0, indicatorValues:[[indicatorId:0x09, propertyId:2, value:0xFF]]).format())
+                break
             case 1:     // Button pressed or held, idle timeout reached without explicit submission
                 state.type="physical"
                 handleButtons(code)
@@ -700,7 +704,7 @@ private Boolean validateCommand(String pincode) {
 
         if (command != null) {
             sendEvent(name:"validCode", value: "true", isStateChange: true)
-            sendEvent(name:"command", value: command.group, descriptionText: command.name, isStateChange:true)
+            sendEvent(name:"command", value: command.command, descriptionText: command.description, isStateChange:true)
             return true
         }
     }
@@ -784,7 +788,7 @@ void setCommand(code, command, description) {
     if (state.commands == null) state.commands = [:]
 
     if (state.commands[code] != null) { newCode = false }
-    state.commands[code] = [ group: command, name: description ]
+    state.commands[code] = [ command: command, description: description ]
     if (newCode) {
         sendEvent(name: "commandSet", value:"added")
     } else {
@@ -799,7 +803,7 @@ void setCommand(code, command) {
     if (state.commands == null) state.commands = [:]
 
     if (state.commands[code] != null) { newCode = false }
-    state.commands[code] = [ group: command, name: "" ]
+    state.commands[code] = [ command: description, name: "" ]
     if (newCode) {
         sendEvent(name: "commandSet", value:"added")
     } else {
@@ -852,6 +856,16 @@ void deleteCommand(code) {
     }
 
     state.commands = newCodes
+}
+
+void clearAllCommands(confirm) {
+    if (logEnable) log.debug "clearAllCommands(${confirm})"
+
+    if (confirm != "YES") {
+        return;
+    }
+
+    state.commands = [:]
 }
 
 void sendCommand(code) 
