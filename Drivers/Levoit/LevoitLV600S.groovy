@@ -37,6 +37,7 @@ metadata {
     capability "Switch"
     capability "SwitchLevel"
     capability "RelativeHumidityMeasurement"
+    capability "Actuator"
 
     attribute "target_humidity", "number";
     attribute "mode", "string";
